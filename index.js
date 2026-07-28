@@ -726,348 +726,98 @@ client.on('interactionCreate', async interaction => {
         const depName = values[0];
         
         if (depName.toLowerCase().includes('boss studio') && !interaction.member.roles.cache.has(ROLE_BOSS_STUDIO)) {
-          return interaction.reply({ content: 'Accesso negato per visualizzare il deposito Boss Studio.', ephemeral: true });
-        }
-        if (!depName.toLowerCase().includes('boss studio') && !interaction.member.roles.cache.has(ROLE_1) && !interaction.member.roles.cache.has(ROLE_2) && !interaction.member.roles.cache.has(ROLE_3)) {
-          return interaction.reply({ content: 'Accesso negato.', ephemeral: true });
+          return interaction.reply({ content: 'Accesso negato al Deposito Boss Studio.', ephemeral: true });
         }
 
-        const dep = await Deposito.findOne({ depositoName: depName });
-        let desc = `**Oggetti nel deposito:**\n\n`;
-        if (!dep || dep.items.length === 0) {
-          desc += `Nessun oggetto disponibile.`;
-        } else {
-          dep.items.forEach(i => desc += `• **${i.name}**: ${i.quantity}\n`);
-        }
+        let dep = await Deposito.findOne({ depositoName: depName });
+        if (!dep || dep.items.length === 0) return interaction.reply({ content: `Il deposito **${depName}** è vuoto.`, ephemeral: true });
 
-        return interaction.reply({ embeds: [new EmbedBuilder().setTitle(`📦 Status ${depName}`).setDescription(desc).setColor(0x1ABC9C)] });
-      }
+        let desc = `**📦 Contenuto di ${depName}:**\n\n`;
+        dep.items.forEach(i => desc += `• **${i.name}**: ${i.quantity}\n`);
 
-      // --- CAMPO ADD USER TRIGGER ---
-      if (customId.startsWith('campo_add_user_')) {
-        const sessionNum = customId.replace('campo_add_user_', '');
-        const modal = new ModalBuilder()
-          .setCustomId(`modal_campo_add_user_${sessionNum}`)
-          .setTitle('Aggiungi Partecipante Campo')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('user_mention').setLabel('Menziona Partecipante (@User)').setStyle(TextInputStyle.Short).setRequired(true)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('weapon_given').setLabel('Arma Data (lascia vuoto se Nessuna)').setStyle(TextInputStyle.Short).setRequired(false)
-            )
-          );
-        return interaction.showModal(modal);
-      }
-
-      // --- STOP CAMPO TRIGGER ---
-      if (customId === 'select_stop_campo') {
-        const sessionNum = values[0];
-        const modal = new ModalBuilder()
-          .setCustomId(`modal_stop_campo_outcome_${sessionNum}`)
-          .setTitle(`Termina Campo #${sessionNum}`)
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('outcome').setLabel('Esito: Scrivi WON o LOST').setStyle(TextInputStyle.Short).setRequired(true)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('opponent').setLabel('Fazione Avversaria').setStyle(TextInputStyle.Short).setRequired(true)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('weapons_lost').setLabel('Armi Perse (se LOST)').setValue('0').setStyle(TextInputStyle.Short).setRequired(false)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('kills').setLabel('Kills (Formato: @User1:2, @User2:5)').setStyle(TextInputStyle.Paragraph).setRequired(false)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('loot').setLabel('Loot (Formato: tipo:nome:qty)').setPlaceholder('es: weapons:AK47:2, drugs:Erba:50, bullets:9mm:500').setStyle(TextInputStyle.Paragraph).setRequired(false)
-            )
-          );
-        return interaction.showModal(modal);
-      }
-
-      // --- PLAYER CAMPO SESSION SELECT ---
-      if (customId === 'select_player_campo_session') {
-        const sessionNum = values[0];
-        const modal = new ModalBuilder()
-          .setCustomId(`modal_manage_player_campo_${sessionNum}`)
-          .setTitle(`Gestisci Player Campo #${sessionNum}`)
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('target_user').setLabel('Menzione Utente (@User)').setStyle(TextInputStyle.Short).setRequired(true)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('action').setLabel('Azione: JOIN, LEAVE, o ADJUST').setStyle(TextInputStyle.Short).setRequired(true)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('weapon').setLabel('Arma Data (Opzionale)').setStyle(TextInputStyle.Short).setRequired(false)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('minutes').setLabel('Minuti +/- (se azione ADJUST)').setStyle(TextInputStyle.Short).setRequired(false)
-            )
-          );
-        return interaction.showModal(modal);
-      }
-
-      // --- DEPOSITO ITEM SELECTION ---
-      if (customId.startsWith('select_deposito_item_')) {
-        const depName = decodeURIComponent(customId.replace('select_deposito_item_', ''));
-        const modal = new ModalBuilder()
-          .setCustomId(`modal_update_deposito_items_${encodeURIComponent(depName)}`)
-          .setTitle('Modifica Quantità Deposito');
-
-        values.forEach(itemName => {
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId(`qty_${itemName}`)
-                .setLabel(`Qtà da aggiungere/rimuovere per ${itemName}`)
-                .setPlaceholder('es. 5 oppure -3')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-            )
-          );
-        });
-
-        return interaction.showModal(modal);
+        const embed = new EmbedBuilder().setTitle(`📋 ${depName}`).setDescription(desc).setColor(0x2ECC71);
+        return interaction.reply({ embeds: [embed] });
       }
     }
 
     // ----------------------------------------------------
-    // 3. MODAL SUBMISSION HANDLING
+    // 3. MODAL SUBMIT HANDLING
     // ----------------------------------------------------
     if (interaction.isModalSubmit()) {
       const { customId, fields } = interaction;
 
-      // --- FURTO MODAL ---
+      // --- FURTO QUANTITY MODAL ---
       if (customId.startsWith('modal_furto_qty_')) {
         const targetId = customId.replace('modal_furto_qty_', '');
-        const items = [];
+        const itemsToSave = [];
         let soldiSporchiAmount = 0;
 
-        fields.fields.forEach((field, key) => {
-          const itemName = key.replace('item_qty_', '');
+        fields.fields.forEach((field, id) => {
+          const itemName = id.replace('item_qty_', '');
           const qty = parseInt(field.value) || 0;
-          items.push({ name: itemName, quantity: qty });
 
           if (itemName === 'Soldi Sporchi') {
-            soldiSporchiAmount += qty;
+            soldiSporchiAmount = qty;
+          } else {
+            itemsToSave.push({ name: itemName, quantity: qty });
           }
         });
 
         await Furto.create({
           executorId: interaction.user.id,
           taggedUser: targetId,
-          items: items,
-          soldiSporchiAmount: soldiSporchiAmount
+          items: itemsToSave,
+          soldiSporchiAmount
         });
 
-        return interaction.reply(`✅ **Furto registrato per <@${targetId}>!**\n` + items.map(i => `• ${i.name}: x${i.quantity}`).join('\n'));
+        return interaction.reply({ content: `✅ **Furto registrato con successo** per <@${targetId}>!`, ephemeral: true });
       }
 
-      // --- CAMPO ADD USER MODAL ---
-      if (customId.startsWith('modal_campo_add_user_')) {
-        const sessionNum = parseInt(customId.replace('modal_campo_add_user_', ''));
-        const userMention = fields.getTextInputValue('user_mention');
-        const weaponGiven = fields.getTextInputValue('weapon_given') || null;
-
-        const uid = userMention.replace(/<@!?|>/g, '');
-        const campo = await Campo.findOne({ sessionNumber: sessionNum });
-
-        campo.participants.push({
-          userId: uid,
-          weaponGiven: weaponGiven,
-          joinedAt: new Date(),
-          isCurrentlyActive: true
-        });
-        await campo.save();
-
-        // Deposito B.A. Automation for Weapons Handed Out
-        if (weaponGiven) {
-          let depBA = await Deposito.findOne({ depositoName: 'Deposito B.A.' });
-          if (!depBA) depBA = await Deposito.create({ depositoName: 'Deposito B.A.', items: [] });
-          
-          const existingItem = depBA.items.find(i => i.name.toLowerCase() === weaponGiven.toLowerCase());
-          if (existingItem) existingItem.quantity += 1;
-          else depBA.items.push({ name: weaponGiven, quantity: 1 });
-          
-          await depBA.save();
-        }
-
-        return interaction.reply(`✅ Partecipante <@${uid}> aggiunto al Campo #${sessionNum}.${weaponGiven ? ` Arma **${weaponGiven}** aggiunta automaticamente al Deposito B.A.` : ''}`);
-      }
-
-      // --- STOP CAMPO MODAL ---
-      if (customId.startsWith('modal_stop_campo_outcome_')) {
-        const sessionNum = parseInt(customId.replace('modal_stop_campo_outcome_', ''));
-        const outcome = fields.getTextInputValue('outcome').toUpperCase();
-        const opponent = fields.getTextInputValue('opponent');
-        const weaponsLost = parseInt(fields.getTextInputValue('weapons_lost')) || 0;
-        const killsText = fields.getTextInputValue('kills') || '';
-        const lootText = fields.getTextInputValue('loot') || '';
-
-        const campo = await Campo.findOne({ sessionNumber: sessionNum });
-        campo.status = 'COMPLETED';
-        campo.endTime = new Date();
-        campo.outcome = outcome;
-        campo.opponentFaction = opponent;
-        campo.weaponsLost = weaponsLost;
-
-        // Stop participant timers
-        campo.participants.forEach(p => {
-          if (p.isCurrentlyActive) {
-            p.accumulatedSeconds += Math.floor((Date.now() - new Date(p.joinedAt).getTime()) / 1000);
-            p.isCurrentlyActive = false;
-            p.leftAt = new Date();
-          }
-        });
-
-        // Parse kills
-        if (killsText) {
-          const killEntries = killsText.split(',');
-          killEntries.forEach(entry => {
-            const [uMatch, kVal] = entry.split(':');
-            if (uMatch && kVal) {
-              const uid = uMatch.trim().replace(/<@!?|>/g, '');
-              const part = campo.participants.find(p => p.userId === uid);
-              if (part) part.kills = parseInt(kVal.trim()) || 0;
-            }
-          });
-        }
-
-        // Parse & apply loot automations
-        if (outcome === 'WON' && lootText) {
-          const lootEntries = lootText.split(',');
-          let bossStudioDep = await Deposito.findOne({ depositoName: 'Deposito Boss Studio' });
-          if (!bossStudioDep) bossStudioDep = await Deposito.create({ depositoName: 'Deposito Boss Studio', items: [] });
-
-          for (const entry of lootEntries) {
-            const [cat, name, qty] = entry.split(':').map(s => s.trim());
-            const parsedQty = parseInt(qty) || 0;
-            campo.loot.push({ category: cat.toLowerCase(), name, quantity: parsedQty });
-
-            // Automate Drugs to Deposito Boss Studio
-            if (cat.toLowerCase() === 'drugs') {
-              const itemInBoss = bossStudioDep.items.find(i => i.name.toLowerCase() === name.toLowerCase());
-              if (itemInBoss) itemInBoss.quantity += parsedQty;
-              else bossStudioDep.items.push({ name: name, quantity: parsedQty });
-            }
-          }
-          await bossStudioDep.save();
-        }
-
-        // Automate weapons lost subtraction from Deposito B.A.
-        if (outcome === 'LOST' && weaponsLost > 0) {
-          let depBA = await Deposito.findOne({ depositoName: 'Deposito B.A.' });
-          if (depBA && depBA.items.length > 0) {
-            depBA.items[0].quantity = Math.max(0, depBA.items[0].quantity - weaponsLost);
-            await depBA.save();
-          }
-        }
-
-        await campo.save();
-        return interaction.reply(`🛑 **Campo #${sessionNum} terminato!** Esito: **${outcome}**.`);
-      }
-
-      // --- PLAYER CAMPO MANAGEMENT MODAL ---
-      if (customId.startsWith('modal_manage_player_campo_')) {
-        const sessionNum = parseInt(customId.replace('modal_manage_player_campo_', ''));
-        const targetUser = fields.getTextInputValue('target_user');
-        const action = fields.getTextInputValue('action').toUpperCase();
-        const weapon = fields.getTextInputValue('weapon') || null;
-        const minutes = parseInt(fields.getTextInputValue('minutes')) || 0;
-
-        const uid = targetUser.replace(/<@!?|>/g, '');
-        const campo = await Campo.findOne({ sessionNumber: sessionNum });
-        let p = campo.participants.find(part => part.userId === uid);
-
-        if (action === 'JOIN') {
-          if (!p) {
-            campo.participants.push({ userId: uid, weaponGiven: weapon, joinedAt: new Date(), isCurrentlyActive: true });
-          } else {
-            p.joinedAt = new Date();
-            p.isCurrentlyActive = true;
-            if (weapon) p.weaponGiven = weapon;
-          }
-        } else if (action === 'LEAVE') {
-          if (p && p.isCurrentlyActive) {
-            p.accumulatedSeconds += Math.floor((Date.now() - new Date(p.joinedAt).getTime()) / 1000);
-            p.isCurrentlyActive = false;
-            p.leftAt = new Date();
-          }
-        } else if (action === 'ADJUST') {
-          if (p) p.manualAdjustmentMinutes += minutes;
-        }
-
-        // Weapon handed out -> Deposito B.A. automation
-        if (weapon && (action === 'JOIN' || action === 'ADJUST')) {
-          let depBA = await Deposito.findOne({ depositoName: 'Deposito B.A.' });
-          if (!depBA) depBA = await Deposito.create({ depositoName: 'Deposito B.A.', items: [] });
-          const existingItem = depBA.items.find(i => i.name.toLowerCase() === weapon.toLowerCase());
-          if (existingItem) existingItem.quantity += 1;
-          else depBA.items.push({ name: weapon, quantity: 1 });
-          await depBA.save();
-        }
-
-        await campo.save();
-        return interaction.reply(`✅ Player <@${uid}> in Campo #${sessionNum} aggiornato!`);
-      }
-
-      // --- AGGIORNA DEPOSITO MODAL ---
+      // --- DEPOSITO UPDATE MODAL ---
       if (customId.startsWith('modal_aggiorna_deposito_')) {
         const depName = decodeURIComponent(customId.replace('modal_aggiorna_deposito_', ''));
         const itemName = fields.getTextInputValue('item_name');
         const itemQty = parseInt(fields.getTextInputValue('item_qty')) || 0;
 
         let dep = await Deposito.findOne({ depositoName: depName });
-        if (!dep) dep = await Deposito.create({ depositoName: depName, items: [] });
+        if (!dep) dep = new Deposito({ depositoName: depName, items: [] });
 
-        const existing = dep.items.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-        if (existing) existing.quantity += itemQty;
-        else dep.items.push({ name: itemName, quantity: itemQty });
-
-        await dep.save();
-        return interaction.reply(`✅ Aggiornato **${depName}**: aggiunti ${itemQty}x **${itemName}**.`);
-      }
-
-      // --- UPDATE DEPOSITO ITEMS MODAL ---
-      if (customId.startsWith('modal_update_deposito_items_')) {
-        const depName = decodeURIComponent(customId.replace('modal_update_deposito_items_', ''));
-        let dep = await Deposito.findOne({ depositoName: depName });
-
-        fields.fields.forEach((field, key) => {
-          const itemName = key.replace('qty_', '');
-          const qtyChange = parseInt(field.value) || 0;
-
-          const item = dep.items.find(i => i.name === itemName);
-          if (item) item.quantity = Math.max(0, item.quantity + qtyChange);
-        });
+        const existingItem = dep.items.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+        if (existingItem) {
+          existingItem.quantity += itemQty;
+        } else {
+          dep.items.push({ name: itemName, quantity: itemQty });
+        }
 
         await dep.save();
-        return interaction.reply(`✅ Quantità nel deposito **${depName}** aggiornate.`);
+        return interaction.reply(`✅ Aggiunti **x${itemQty} ${itemName}** al deposito **${depName}**!`);
       }
 
-      // --- START MINIERA MODAL ---
+      // --- MINIERA START MODAL ---
       if (customId === 'modal_start_miniera') {
         const text = fields.getTextInputValue('participants');
-        const userMatches = text.match(/<@!?(\d+)>/g);
+        const matches = text.match(/<@!?(\d+)>/g);
 
-        const doc = await getGlobalMinieraDoc();
-        if (userMatches) {
-          const ids = [...new Set(userMatches.map(m => m.replace(/<@!?|>/g, '')))];
-          ids.forEach(uid => {
-            doc.activeSession.participants.push({
-              userId: uid,
-              joinedAt: new Date(),
-              isCurrentlyActive: true
-            });
-          });
+        if (!matches || matches.length === 0) {
+          return interaction.reply({ content: 'Nessun utente valido menzionato.', ephemeral: true });
         }
+
+        const userIds = [...new Set(matches.map(m => m.replace(/<@!?|>/g, '')))];
+        const doc = await getGlobalMinieraDoc();
+
+        userIds.forEach(uid => {
+          doc.activeSession.participants.push({
+            userId: uid,
+            joinedAt: new Date(),
+            isCurrentlyActive: true
+          });
+        });
+
         await doc.save();
-        return interaction.reply('⛏️ **Sessione Miniera Avviata!** Timer in corso per i partecipanti.');
+        return interaction.reply(`⛏️ **Sessione Miniera Avviata!** Partecipanti iniziali: ${userIds.map(id => `<@${id}>`).join(', ')}`);
       }
 
-      // --- STOP MINIERA MINERALS MODAL ---
+      // --- MINIERA STOP MODAL ---
       if (customId === 'modal_stop_miniera_minerals') {
         const doc = await getGlobalMinieraDoc();
 
@@ -1076,20 +826,21 @@ client.on('interactionCreate', async interaction => {
         const carbone = parseInt(fields.getTextInputValue('Carbone')) || 0;
         const ferro = parseInt(fields.getTextInputValue('Ferro')) || 0;
         const altriStr = fields.getTextInputValue('Altri') || '0,0,0,0,0';
-        const [argento, rubino, oro, smeraldo, diamante] = altriStr.split(',').map(s => parseInt(s.trim()) || 0);
+        
+        const [argento, rubino, oro, smeraldo, diamante] = altriStr.split(',').map(v => parseInt(v.trim()) || 0);
 
-        doc.stockpile.Legno += legno;
-        doc.stockpile.Pietra += pietra;
-        doc.stockpile.Carbone += carbone;
-        doc.stockpile.Ferro += ferro;
-        doc.stockpile.Argento += argento;
-        doc.stockpile.Rubino += rubino;
-        doc.stockpile.Oro += oro;
-        doc.stockpile.Smeraldo += smeraldo;
-        doc.stockpile.Diamante += diamante;
+        doc.stockpile.Legno = (doc.stockpile.Legno || 0) + legno;
+        doc.stockpile.Pietra = (doc.stockpile.Pietra || 0) + pietra;
+        doc.stockpile.Carbone = (doc.stockpile.Carbone || 0) + carbone;
+        doc.stockpile.Ferro = (doc.stockpile.Ferro || 0) + ferro;
+        doc.stockpile.Argento = (doc.stockpile.Argento || 0) + argento;
+        doc.stockpile.Rubino = (doc.stockpile.Rubino || 0) + rubino;
+        doc.stockpile.Oro = (doc.stockpile.Oro || 0) + oro;
+        doc.stockpile.Smeraldo = (doc.stockpile.Smeraldo || 0) + smeraldo;
+        doc.stockpile.Diamante = (doc.stockpile.Diamante || 0) + diamante;
 
         await doc.save();
-        return interaction.reply('🛑 **Sessione Miniera terminata e minerali aggiunti allo stockpile globale!**');
+        return interaction.reply('🛑 **Sessione Miniera conclusa e stockpile aggiornato con successo!**');
       }
 
       // --- MODIFICA MINERALI MODAL ---
@@ -1098,24 +849,27 @@ client.on('interactionCreate', async interaction => {
         const qty = parseInt(fields.getTextInputValue('mineral_qty')) || 0;
 
         const doc = await getGlobalMinieraDoc();
-        if (doc.stockpile[name] !== undefined) {
-          doc.stockpile[name] = qty;
-          await doc.save();
-          return interaction.reply(`✅ Minerale **${name}** aggiornato a quantità: **${qty}**.`);
-        } else {
-          return interaction.reply({ content: `Minerale "${name}" non valido. Scegli tra: ${Object.keys(ITEM_PRICES).join(', ')}`, ephemeral: true });
+        
+        // Find exact key ignoring case
+        const matchedKey = Object.keys(ITEM_PRICES).find(k => k.toLowerCase() === name.toLowerCase());
+        if (!matchedKey) {
+          return interaction.reply({ content: `Minerale non riconosciuto. Usa uno tra: ${Object.keys(ITEM_PRICES).join(', ')}`, ephemeral: true });
         }
+
+        doc.stockpile[matchedKey] = qty;
+        await doc.save();
+
+        return interaction.reply(`✅ Stockpile per **${matchedKey}** aggiornato a **${qty}**.`);
       }
     }
+
   } catch (err) {
-    console.error('Interaction error:', err);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: 'Si è verificato un errore durante l\'esecuzione del comando.', ephemeral: true });
-    } else {
-      await interaction.reply({ content: 'Si è verificato un errore durante l\'esecuzione del comando.', ephemeral: true });
+    console.error('Error handling interaction:', err);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Si è verificato un errore durante l\'esecuzione del comando.', ephemeral: true }).catch(() => {});
     }
   }
 });
 
-// Login Bot
+// Client Login
 client.login(process.env.DISCORD_TOKEN);
