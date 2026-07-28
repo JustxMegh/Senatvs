@@ -16,7 +16,7 @@ const {
 const mongoose = require('mongoose');
 
 // Mongoose Models
-const Rapina = require('./models/Rapina,js');
+const Rapina = require('./models/Rapina.js');
 const Furto = require('./models/Furto.js');
 const Campo = require('./models/Campo.js');
 const Deposito = require('./models/Deposito.js');
