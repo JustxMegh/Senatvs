@@ -16,11 +16,11 @@ const {
 const mongoose = require('mongoose');
 
 // Mongoose Models
-const Rapina = require('./models/Rapina');
-const Furto = require('./models/Furto');
-const Campo = require('./models/Campo');
-const Deposito = require('./models/Deposito');
-const Miniera = require('./models/Miniera');
+const Rapina = require('./models/Rapina,js');
+const Furto = require('./models/Furto.js');
+const Campo = require('./models/Campo.js');
+const Deposito = require('./models/Deposito.js');
+const Miniera = require('./models/Miniera.js');
 
 // --- CONSTANTS & ROLES ---
 const ROLE_1 = '1504768108106354702';
