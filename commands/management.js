@@ -90,10 +90,11 @@ module.exports = [
         } 
 
         // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
+        // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          // Utilizziamo .lean() per leggere l'oggetto JavaScript puro
+          // Leggiamo i documenti grezzi dal DB
           const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
@@ -107,30 +108,35 @@ module.exports = [
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
             
-            // ID di chi ha effettuato la registrazione
-            const userId = m.executorId || m.userId || m.user;
+            // Cerca l'ID utente provando tutti i possibili nomi usati nel codice
+            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId || m.idUtente;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Costruiamo la lista dinamica di COSA ha portato l'utente
-            const itemsObj = m.items || {};
+            // Cerca l'oggetto items o gestisce materiali memorizzati come proprietà dirette
+            const itemsObj = m.items || m.materiali || m.qty || {};
             const dettagli = [];
 
-            for (const [materiale, qta] of Object.entries(itemsObj)) {
+            // Se itemsObj è un oggetto vuoto, proviamo a cercare se le quantità sono salvate direttamente sul documento (es: m.legno)
+            const listaMateriali = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
+            
+            for (const mat of listaMateriali) {
+              const qta = Number(itemsObj[mat] !== undefined ? itemsObj[mat] : m[mat]) || 0;
               if (qta > 0) {
-                const nomeMat = materiale.charAt(0).toUpperCase() + materiale.slice(1);
+                const nomeMat = mat.charAt(0).toUpperCase() + mat.slice(1);
                 dettagli.push(`${nomeMat}: **x${qta}**`);
               }
             }
 
             const elencoOggetti = dettagli.length > 0 ? dettagli.join(' | ') : 'Nessun dettaglio';
-            const valoreTotale = m.totalEarnings ? ` | Valore: **$${m.totalEarnings.toLocaleString()}**` : '';
+            const guadagnoNum = m.totalEarnings !== undefined ? m.totalEarnings : (m.guadagno || m.totale);
+            const valoreTotale = guadagnoNum !== undefined ? ` | Valore: **$${Number(guadagnoNum).toLocaleString()}**` : '';
 
             testo += `**${index + 1}.** ${utente} (Data: ${dateDisplay})${valoreTotale}\n`;
             testo += `┗ 📦 **Ha portato:** ${elencoOggetti}\n\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
-        } 
+        }
 
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
