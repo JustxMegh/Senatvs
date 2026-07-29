@@ -36,7 +36,7 @@ module.exports = [
           },
           {
             label: 'Rapine',
-            description: 'Mostra i log delle rapine effettuate',
+            description: 'Mostra i log e le percentuali di contributo delle rapine',
             value: 'lista_rapine',
             emoji: '💰',
           },
@@ -74,7 +74,6 @@ module.exports = [
 
           let testo = '🕵️ **Ultimi 10 Furti Registrati:**\n\n';
           furti.forEach((f, index) => {
-            // Calcolo totale oggetti sommando le quantity dell'array items
             let totaleOggetti = 0;
             if (f.items && Array.isArray(f.items)) {
               totaleOggetti = f.items.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
@@ -82,7 +81,6 @@ module.exports = [
               totaleOggetti = f.totalItems;
             }
 
-            // Gestione sicura della data per evitare NaN
             const rawDate = f.date || f.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
@@ -113,19 +111,62 @@ module.exports = [
         } 
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
-          const rapine = await Rapina.find().sort({ date: -1, createdAt: -1 }).limit(10);
+          const tutteLeRapine = await Rapina.find();
 
-          if (!rapine || rapine.length === 0) {
+          if (!tutteLeRapine || tutteLeRapine.length === 0) {
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          let testo = '💰 **Ultime 10 Rapine Registrate:**\n\n';
-          rapine.forEach((r, index) => {
+          // Calcolo totale globale accumulato da tutte le rapine
+          const totaleGenerale = tutteLeRapine.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
+
+          // Calcolo totale accreditato a ciascun utente
+          const contributoUtenti = {};
+
+          tutteLeRapine.forEach(r => {
+            const importo = r.totalAmount || 0;
+            const listaPartecipanti = (r.participants && r.participants.length > 0)
+              ? r.participants
+              : (r.executorId ? [r.executorId] : []);
+
+            if (listaPartecipanti.length > 0) {
+              const quotaSingola = importo / listaPartecipanti.length;
+              listaPartecipanti.forEach(userId => {
+                contributoUtenti[userId] = (contributoUtenti[userId] || 0) + quotaSingola;
+              });
+            }
+          });
+
+          // Creazione testo per ultime 10 rapine
+          const ultimeRapine = tutteLeRapine
+            .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
+            .slice(0, 10);
+
+          let testo = `💰 **Ultime Rapine Registrate (Totale Globale: $${totaleGenerale.toLocaleString()}):**\n\n`;
+
+          ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : `| Data: <t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : ` | <t:${timestampSec}:R>`;
 
-            testo += `**${index + 1}.** Totale: **$${r.totalAmount ? r.totalAmount.toLocaleString() : 0}** | Quota: **$${r.splitAmountPerUser ? r.splitAmountPerUser.toFixed(2) : 0}** ${dateDisplay}\n`;
+            const elencoPartecipanti = (r.participants && r.participants.length > 0)
+              ? r.participants.map(p => `<@${p}>`).join(', ')
+              : `<@${r.executorId}>`;
+
+            testo += `**${index + 1}.** Importo: **$${(r.totalAmount || 0).toLocaleString()}** | Partecipanti: ${elencoPartecipanti}${dateDisplay}\n`;
+          });
+
+          // Sezione Percentuali di Contributo per Utente
+          testo += `\n📊 **Contributo e Percentuali sul Totale:**\n`;
+
+          const utentiOrdinati = Object.entries(contributoUtenti)
+            .sort(([, totalA], [, totalB]) => totalB - totalA);
+
+          utentiOrdinati.forEach(([userId, importoGenerato]) => {
+            const percentuale = totaleGenerale > 0 
+              ? ((importoGenerato / totaleGenerale) * 100).toFixed(1) 
+              : '0.0';
+            testo += `• <@${userId}>: **$${importoGenerato.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}%)\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
