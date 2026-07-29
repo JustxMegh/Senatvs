@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-const Miniera = require('../Models/Miniera.js');
+const Miniera = require('../Models /Miniera.js');
 // Importa eventuali altri modelli se necessari (es. Rapina, Furto)
 
 module.exports = [
