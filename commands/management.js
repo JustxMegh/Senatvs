@@ -17,7 +17,7 @@ module.exports = [
     async execute(interaction) {
       await interaction.deferReply();
 
-      // 1. Menu a tendina per selezione categoria
+      // 1. Menu a tendina per la selezione della categoria
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('select_lista_categoria')
         .setPlaceholder('Seleziona la lista che vuoi visualizzare...')
@@ -49,7 +49,7 @@ module.exports = [
         components: [row],
       });
 
-      // 2. Ascolto interazione menu
+      // 2. Ascolto delle selezioni dall'utente
       const collector = response.createMessageComponentCollector({
         componentType: ComponentType.StringSelect,
         time: 60000,
@@ -64,8 +64,9 @@ module.exports = [
 
         const selezione = i.values[0];
 
+        // --- SEZIONE FURTI ---
         if (selezione === 'lista_furti') {
-          const furti = await Furto.find().sort({ date: -1 }).limit(10);
+          const furti = await Furto.find().sort({ date: -1, createdAt: -1 }).limit(10);
           
           if (!furti || furti.length === 0) {
             return await interaction.editReply({ content: '🕵️ **Lista Furti:** Nessun record trovato.', components: [] });
@@ -73,13 +74,27 @@ module.exports = [
 
           let testo = '🕵️ **Ultimi 10 Furti Registrati:**\n\n';
           furti.forEach((f, index) => {
-            testo += `**${index + 1}.** Vittima: <@${f.taggedUser}> | Totale oggetti: **${f.totalItems || 0}** | Data: <t:${Math.floor(new Date(f.date).getTime() / 1000)}:R>\n`;
+            // Calcolo totale oggetti sommando le quantity dell'array items
+            let totaleOggetti = 0;
+            if (f.items && Array.isArray(f.items)) {
+              totaleOggetti = f.items.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+            } else if (typeof f.totalItems === 'number') {
+              totaleOggetti = f.totalItems;
+            }
+
+            // Gestione sicura della data per evitare NaN
+            const rawDate = f.date || f.createdAt || new Date();
+            const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
+            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+
+            testo += `**${index + 1}.** Vittima: <@${f.taggedUser}> | Totale oggetti: **${totaleOggetti}** | Data: ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         } 
+        // --- SEZIONE MINIERA ---
         else if (selezione === 'lista_miniera') {
-          const miniera = await Miniera.find().sort({ date: -1 }).limit(10);
+          const miniera = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10);
 
           if (!miniera || miniera.length === 0) {
             return await interaction.editReply({ content: '⛏️ **Lista Minerali/Miniera:** Nessun record trovato.', components: [] });
@@ -87,13 +102,18 @@ module.exports = [
 
           let testo = '⛏️ **Ultimi 10 Log Miniera:**\n\n';
           miniera.forEach((m, index) => {
-            testo += `**${index + 1}.** Utente: <@${m.executorId}> | Pezzi: **${m.totalItems || 0}** | Guadagno: **$${m.totalEarnings ? m.totalEarnings.toLocaleString() : 0}**\n`;
+            const rawDate = m.date || m.createdAt || new Date();
+            const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
+            const dateDisplay = isNaN(timestampSec) ? '' : `| Data: <t:${timestampSec}:R>`;
+
+            testo += `**${index + 1}.** Utente: <@${m.executorId}> | Pezzi: **${m.totalItems || 0}** | Guadagno: **$${m.totalEarnings ? m.totalEarnings.toLocaleString() : 0}** ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         } 
+        // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
-          const rapine = await Rapina.find().sort({ date: -1 }).limit(10);
+          const rapine = await Rapina.find().sort({ date: -1, createdAt: -1 }).limit(10);
 
           if (!rapine || rapine.length === 0) {
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
@@ -101,7 +121,11 @@ module.exports = [
 
           let testo = '💰 **Ultime 10 Rapine Registrate:**\n\n';
           rapine.forEach((r, index) => {
-            testo += `**${index + 1}.** Totale: **$${r.totalAmount ? r.totalAmount.toLocaleString() : 0}** | Quota: **$${r.splitAmountPerUser ? r.splitAmountPerUser.toFixed(2) : 0}**\n`;
+            const rawDate = r.date || r.createdAt || new Date();
+            const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
+            const dateDisplay = isNaN(timestampSec) ? '' : `| Data: <t:${timestampSec}:R>`;
+
+            testo += `**${index + 1}.** Totale: **$${r.totalAmount ? r.totalAmount.toLocaleString() : 0}** | Quota: **$${r.splitAmountPerUser ? r.splitAmountPerUser.toFixed(2) : 0}** ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
