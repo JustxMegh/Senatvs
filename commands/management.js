@@ -9,7 +9,7 @@ const Furto = require('../Models /Furto.js');
 const Rapina = require('../Models /Rapina.js');
 const Miniera = require('../Models /Miniera.js');
 
-// Elenco base dei minerali da mostrare sempre nel dettaglio (anche se 0)
+// Elenco base dei minerali da mostrare sempre nel dettaglio
 const LISTA_MINERALI_DEFAULT = ['ferro', 'rame', 'oro', 'diamante', 'smeraldo'];
 
 module.exports = [
@@ -81,16 +81,19 @@ module.exports = [
               totaleOggetti = f.totalItems;
             }
 
+            const userId = f.taggedUser || f.userId || f.user || f.executorId;
+            const utenteText = userId ? `<@${userId}>` : 'Sconosciuto';
+
             const rawDate = f.date || f.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
 
-            testo += `**${index + 1}.** Vittima: <@${f.taggedUser}> | Totale oggetti: **${totaleOggetti}** | Data: ${dateDisplay}\n`;
+            testo += `**${index + 1}.** Vittima: ${utenteText} | Totale oggetti: **${totaleOggetti}** | Data: ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA (Elenco Completo Tutti i Minerali) ---
+        // --- SEZIONE MINIERA ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
@@ -106,33 +109,57 @@ module.exports = [
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
-            const utente = m.executorId ? `<@${m.executorId}>` : (m.user ? `<@${m.user}>` : 'Sconosciuto');
+            
+            // Verifica flessibile del campo utente
+            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
+            const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Mappa o conteggio dei minerali per questa registrazione
-            let dettagliMinerali = [];
+            // Mappa per accumulare le quantità dei minerali trovati nel documento
+            const mappaMinerali = {};
+            LISTA_MINERALI_DEFAULT.forEach(min => mappaMinerali[min] = 0);
 
-            if (m.items && Array.isArray(m.items) && m.items.length > 0) {
-              // Se i dati sono salvati come array di oggetti (es. [{ name: 'ferro', quantity: 5 }])
-              LISTA_MINERALI_DEFAULT.forEach((min) => {
-                const trovato = m.items.find(i => i.name && i.name.toLowerCase() === min);
-                const qta = trovato ? (trovato.quantity || 0) : 0;
-                dettagliMinerali.push(`${min}: **${qta}**`);
-              });
-            } else if (m.minerali && typeof m.minerali === 'object') {
-              // Se i dati sono salvati come oggetto (es. { ferro: 5, rame: 0 })
-              LISTA_MINERALI_DEFAULT.forEach((min) => {
-                const qta = m.minerali[min] || 0;
-                dettagliMinerali.push(`${min}: **${qta}**`);
-              });
-            } else if (m.mineralType && m.quantity !== undefined) {
-              // Se salvato come minerale singolo
-              dettagliMinerali.push(`${m.mineralType}: **${m.quantity}**`);
-            } else {
-              // Se non ci sono dati specifici sui singoli minerali
-              LISTA_MINERALI_DEFAULT.forEach((min) => {
-                dettagliMinerali.push(`${min}: **0**`);
+            // 1. Controlla se il documento ha le proprietà direttamente sul root (es. m.ferro, m.rame)
+            LISTA_MINERALI_DEFAULT.forEach((min) => {
+              if (m[min] !== undefined && typeof m[min] === 'number') {
+                mappaMinerali[min] = m[min];
+              }
+            });
+
+            // 2. Controlla se i dati sono dentro un oggetto `m.minerali` o `m.items` (Mongoose Map o Plain Object)
+            if (m.minerali) {
+              const objMinerali = m.minerali instanceof Map ? Object.fromEntries(m.minerali) : m.minerali;
+              Object.keys(objMinerali).forEach((k) => {
+                const keyLower = k.toLowerCase();
+                if (mappaMinerali.hasOwnProperty(keyLower)) {
+                  mappaMinerali[keyLower] = Number(objMinerali[k]) || 0;
+                }
               });
             }
+
+            // 3. Controlla se i dati sono in un Array di oggetti (es. [{ name: 'ferro', quantity: 5 }])
+            const itemsArray = m.items || m.minerals || m.lista;
+            if (Array.isArray(itemsArray)) {
+              itemsArray.forEach((item) => {
+                const nomeItem = (item.name || item.nome || item.type || item.mineralType || '').toLowerCase();
+                const qtaItem = Number(item.quantity || item.quantita || item.count || item.amount) || 0;
+                if (mappaMinerali.hasOwnProperty(nomeItem)) {
+                  mappaMinerali[nomeItem] += qtaItem;
+                }
+              });
+            }
+
+            // 4. Se salvato come minerale singolo (es. m.mineralType = 'ferro', m.quantity = 5)
+            if (m.mineralType && m.quantity !== undefined) {
+              const typeLower = m.mineralType.toLowerCase();
+              if (mappaMinerali.hasOwnProperty(typeLower)) {
+                mappaMinerali[typeLower] = Number(m.quantity) || 0;
+              }
+            }
+
+            // Costruisci la stringa con il resoconto completo
+            const dettagliMinerali = LISTA_MINERALI_DEFAULT.map(
+              min => `${min}: **${mappaMinerali[min]}**`
+            );
 
             testo += `**${index + 1}.** Utente: ${utente} | Data: ${dateDisplay}\n`;
             testo += `┗ 📊 ${dettagliMinerali.join(' | ')}\n\n`;
