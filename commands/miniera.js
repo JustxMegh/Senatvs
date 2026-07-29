@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models /Miniera.js');
+const Miniera = require('../Models/Miniera.js');
 
-// Listino prezzi al pezzo
+// Listino prezzi unitari
 const PREZZI = {
   legno: 105,
   pietra: 75,
@@ -18,8 +18,7 @@ module.exports = [
   {
     data: new SlashCommandBuilder()
       .setName('miniera')
-      .setDescription('Registra un\'estrazione inserendo i minerali desiderati')
-      // Tutti i campi ora sono OPZIONALI (.setRequired(false))
+      .setDescription('Registra il bottino estratto in miniera')
       .addIntegerOption(opt => opt.setName('legno').setDescription('Quantità di Legno ($105/pz)').setRequired(false))
       .addIntegerOption(opt => opt.setName('pietra').setDescription('Quantità di Pietra ($75/pz)').setRequired(false))
       .addIntegerOption(opt => opt.setName('carbone').setDescription('Quantità di Carbone ($105/pz)').setRequired(false))
@@ -33,44 +32,34 @@ module.exports = [
     async execute(interaction) {
       await interaction.deferReply();
 
-      // Raccogliamo solo quello che l'utente ha inserito (default a 0 se non specificato)
-      const qty = {
-        legno: interaction.options.getInteger('legno') || 0,
-        pietra: interaction.options.getInteger('pietra') || 0,
-        carbone: interaction.options.getInteger('carbone') || 0,
-        ferro: interaction.options.getInteger('ferro') || 0,
-        argento: interaction.options.getInteger('argento') || 0,
-        rubino: interaction.options.getInteger('rubino') || 0,
-        oro: interaction.options.getInteger('oro') || 0,
-        smeraldo: interaction.options.getInteger('smeraldo') || 0,
-        diamante: interaction.options.getInteger('diamante') || 0,
-      };
-
+      // Raccogliamo solo i materiali in cui è stata inserita una quantità > 0
+      const materialiDisponibili = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
+      const qty = {};
       let guadagnoTotale = 0;
       let totalePezzi = 0;
-      let dettagliTesto = [];
+      let resocontoRighe = [];
 
-      // Calcoliamo solo sui minerali > 0
-      for (const [key, qta] of Object.entries(qty)) {
-        if (qta > 0) {
-          const prezzoSingolo = PREZZI[key];
-          const subtotale = qta * prezzoSingolo;
+      for (const mat of materialiDisponibili) {
+        const qta = interaction.options.getInteger(mat);
+        if (qta && qta > 0) {
+          qty[mat] = qta;
+          const subtotale = qta * (PREZZI[mat] || 0);
           guadagnoTotale += subtotale;
           totalePezzi += qta;
 
-          const nomeFormattato = key.charAt(0).toUpperCase() + key.slice(1);
-          dettagliTesto.push(`• **${nomeFormattato}:** x${qta} ($${subtotale.toLocaleString()})`);
+          const nomeFormat = mat.charAt(0).toUpperCase() + mat.slice(1);
+          resocontoRighe.push(`• **${nomeFormat}:** x${qta} ($${subtotale.toLocaleString()})`);
         }
       }
 
-      // Se non ha inserito nessun minerale o tutti 0
+      // Se non è stato specificato alcun materiale
       if (totalePezzi === 0) {
         return await interaction.editReply({
-          content: '⚠️ Devi inserire la quantità di almeno un minerale!'
+          content: '⚠️ Devi specificare la quantità di **almeno un materiale** portato!'
         });
       }
 
-      // Salvataggio nel database
+      // Salvataggio nel Database
       await Miniera.create({
         executorId: interaction.user.id,
         items: qty,
@@ -80,20 +69,20 @@ module.exports = [
       });
 
       await interaction.editReply({
-        content: `⛏️ **Estrazione Registrata per ${interaction.user}!**\n\n` +
-                 `**Materiali estratti (Totale pezzi: ${totalePezzi}):**\n${dettagliTesto.join('\n')}\n\n` +
-                 `💰 **Guadagno Totale:** **$${guadagnoTotale.toLocaleString()}**`
+        content: `⛏️ **Consegna Miniera registrata per ${interaction.user}!**\n\n` +
+                 `**Materiali consegnati (${totalePezzi} pezzi totali):**\n${resocontoRighe.join('\n')}\n\n` +
+                 `💰 **Valore totale:** **$${guadagnoTotale.toLocaleString()}**`
       });
     }
   },
   {
     data: new SlashCommandBuilder()
       .setName('minierareset')
-      .setDescription('Azzera tutte le registrazioni della miniera'),
+      .setDescription('Azzera tutti i log della miniera'),
     async execute(interaction) {
       await interaction.deferReply();
       await Miniera.deleteMany({});
-      await interaction.editReply({ content: '🔄 Tutti i dati della **Miniera** sono stati azzerati!' });
+      await interaction.editReply({ content: '🔄 Registro miniera svuotato con successo!' });
     }
   }
 ];
