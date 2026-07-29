@@ -9,8 +9,10 @@ const Furto = require('../Models /Furto.js');
 const Rapina = require('../Models /Rapina.js');
 const Miniera = require('../Models /Miniera.js');
 
-// Elenco base dei minerali da mostrare nel dettaglio
-const LISTA_MINERALI_DEFAULT = ['ferro', 'rame', 'oro', 'diamante', 'smeraldo'];
+// Tutti i 9 materiali previsti dal comando miniera
+const LISTA_MINERALI_DEFAULT = [
+  'legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'
+];
 
 module.exports = [
   {
@@ -93,7 +95,7 @@ module.exports = [
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA ---
+        // --- SEZIONE MINIERA (ELENCO COMPLETO MATERIALI) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
@@ -106,59 +108,29 @@ module.exports = [
           let testo = '⛏️ **Ultime 10 Registrazioni Miniera:**\n\n';
 
           registrazioni.forEach((m, index) => {
-            // LOG TEMPORANEO NEL TERMINALE
-            console.log('--- DATI DOCUMENTO MINIERA DAL DB ---');
-            console.log(m.toObject ? m.toObject() : m);
-
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
             
-            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
+            // Recupero Utente da executorId
+            const userId = m.executorId || m.userId || m.user || m.taggedUser;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            const mappaMinerali = {};
-            LISTA_MINERALI_DEFAULT.forEach(min => mappaMinerali[min] = 0);
+            // Estrazione oggetti da m.items (convertendo Mongoose Map se necessario)
+            let itemsObj = {};
+            if (m.items) {
+              itemsObj = m.items instanceof Map ? Object.fromEntries(m.items) : m.items;
+            }
 
-            LISTA_MINERALI_DEFAULT.forEach((min) => {
-              if (m[min] !== undefined && typeof m[min] === 'number') {
-                mappaMinerali[min] = m[min];
-              }
+            // Costruzione lista con tutti e 9 i materiali
+            const dettagliMinerali = LISTA_MINERALI_DEFAULT.map((mat) => {
+              const qta = Number(itemsObj[mat]) || 0;
+              return `${mat}: **${qta}**`;
             });
 
-            if (m.minerali) {
-              const objMinerali = m.minerali instanceof Map ? Object.fromEntries(m.minerali) : m.minerali;
-              Object.keys(objMinerali).forEach((k) => {
-                const keyLower = k.toLowerCase();
-                if (mappaMinerali.hasOwnProperty(keyLower)) {
-                  mappaMinerali[keyLower] = Number(objMinerali[k]) || 0;
-                }
-              });
-            }
+            const guadagno = m.totalEarnings !== undefined ? ` | Guadagno: **$${m.totalEarnings.toLocaleString()}**` : '';
 
-            const itemsArray = m.items || m.minerals || m.lista;
-            if (Array.isArray(itemsArray)) {
-              itemsArray.forEach((item) => {
-                const nomeItem = (item.name || item.nome || item.type || item.mineralType || '').toLowerCase();
-                const qtaItem = Number(item.quantity || item.quantita || item.count || item.amount) || 0;
-                if (mappaMinerali.hasOwnProperty(nomeItem)) {
-                  mappaMinerali[nomeItem] += qtaItem;
-                }
-              });
-            }
-
-            if (m.mineralType && m.quantity !== undefined) {
-              const typeLower = m.mineralType.toLowerCase();
-              if (mappaMinerali.hasOwnProperty(typeLower)) {
-                mappaMinerali[typeLower] = Number(m.quantity) || 0;
-              }
-            }
-
-            const dettagliMinerali = LISTA_MINERALI_DEFAULT.map(
-              min => `${min}: **${mappaMinerali[min]}**`
-            );
-
-            testo += `**${index + 1}.** Utente: ${utente} | Data: ${dateDisplay}\n`;
+            testo += `**${index + 1}.** Utente: ${utente}${guadagno} | Data: ${dateDisplay}\n`;
             testo += `┗ 📊 ${dettagliMinerali.join(' | ')}\n\n`;
           });
 
@@ -219,7 +191,7 @@ module.exports = [
     }
   },
 
-  // --- COMANDO RESET CON MENU A TENDINA ---
+  // --- COMANDO RESET CON MENU OPZIONI ALL'AVVIO ---
   {
     data: new SlashCommandBuilder()
       .setName('reset')
