@@ -37,40 +37,40 @@ module.exports = [
       try {
         const totalAmount = interaction.options.getNumber('totale');
 
-        // Raccolta dinamica di tutti i partecipanti inseriti (senza duplicati)
-        const participants = [];
+        // Estrazione sicura di tutti i partecipanti selezionati
+        const participantIds = [];
         for (let i = 1; i <= 5; i++) {
           const user = interaction.options.getUser(`partecipante${i}`);
-          if (user && !participants.some(p => p.id === user.id)) {
-            participants.push(user);
+          if (user && !participantIds.includes(user.id)) {
+            participantIds.push(user.id);
           }
         }
 
-        const numParticipants = participants.length;
+        const numParticipants = participantIds.length;
         const splitAmount = totalAmount / numParticipants;
 
-        // Salvataggio nel database con la lista completa dei partecipanti
+        // Salvataggio esplicito dell'array dei partecipanti nel DB
         await Rapina.create({
           executorId: interaction.user.id,
           totalAmount: totalAmount,
-          participants: participants.map(u => u.id),
+          participants: participantIds,
           splitAmountPerUser: splitAmount,
           date: new Date()
         });
 
-        const listaPartecipanti = participants.map(u => `<@${u.id}>`).join(', ');
+        const listaPartecipantiText = participantIds.map(id => `<@${id}>`).join(', ');
 
         await interaction.editReply({
           content: `💰 **Rapina Registrata!**\n\n` +
                    `• **Importo Totale:** $${totalAmount.toLocaleString()}\n` +
-                   `• **Partecipanti (${numParticipants}):** ${listaPartecipanti}\n` +
+                   `• **Partecipanti (${numParticipants}):** ${listaPartecipantiText}\n` +
                    `• **Quota a persona:** $${splitAmount.toFixed(2).toLocaleString()}`
         });
 
       } catch (err) {
         console.error('❌ Errore durante /rapina:', err);
         await interaction.editReply({ 
-          content: `❌ Si è verificato un errore durante la registrazione della rapina: \`${err.message}\`` 
+          content: `❌ Si è verificato un errore durante la registrazione: \`${err.message}\`` 
         });
       }
     }
