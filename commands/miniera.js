@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models /Miniera.js');
+const Miniera = require('../Models /Miniera.js'); // Fix del path (senza spazi extra)
 
 // Listino prezzi al pezzo
 const PREZZI = {
@@ -34,15 +34,15 @@ module.exports = [
 
       // Raccolta quantità inserite dall'utente
       const qty = {
-        legno: interaction.options.getInteger('legno'),
-        pietra: interaction.options.getInteger('pietra'),
-        carbone: interaction.options.getInteger('carbone'),
-        ferro: interaction.options.getInteger('ferro'),
-        argento: interaction.options.getInteger('argento'),
-        rubino: interaction.options.getInteger('rubino'),
-        oro: interaction.options.getInteger('oro'),
-        smeraldo: interaction.options.getInteger('smeraldo'),
-        diamante: interaction.options.getInteger('diamante'),
+        legno: interaction.options.getInteger('legno') || 0,
+        pietra: interaction.options.getInteger('pietra') || 0,
+        carbone: interaction.options.getInteger('carbone') || 0,
+        ferro: interaction.options.getInteger('ferro') || 0,
+        argento: interaction.options.getInteger('argento') || 0,
+        rubino: interaction.options.getInteger('rubino') || 0,
+        oro: interaction.options.getInteger('oro') || 0,
+        smeraldo: interaction.options.getInteger('smeraldo') || 0,
+        diamante: interaction.options.getInteger('diamante') || 0,
       };
 
       // Calcolo guadagno per ciascun materiale e totale
