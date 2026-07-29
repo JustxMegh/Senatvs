@@ -34,39 +34,49 @@ module.exports = [
       try {
         const targetUser = interaction.options.getUser('utente');
 
-        const items = {
-          tv: interaction.options.getInteger('tv') ?? 0,
-          stampante: interaction.options.getInteger('stampante') ?? 0,
-          microonde: interaction.options.getInteger('microonde') ?? 0,
-          caffettiera: interaction.options.getInteger('caffettiera') ?? 0,
-          laptop: interaction.options.getInteger('laptop') ?? 0,
-          audioSystem: interaction.options.getInteger('audio_system') ?? 0,
-          musicDock: interaction.options.getInteger('music_dock') ?? 0,
-          monitor: interaction.options.getInteger('monitor') ?? 0,
-          asciugacapelli: interaction.options.getInteger('asciugacapelli') ?? 0,
-          console: interaction.options.getInteger('console') ?? 0,
-          audioMp3: interaction.options.getInteger('audio_mp3') ?? 0,
-          tostapane: interaction.options.getInteger('tostapane') ?? 0,
-          telescopio: interaction.options.getInteger('telescopio') ?? 0,
-          digitalScales: interaction.options.getInteger('digital_scales') ?? 0,
-          standMixer: interaction.options.getInteger('stand_mixer') ?? 0,
-          bollitore: interaction.options.getInteger('bollitore') ?? 0,
-          vhs: interaction.options.getInteger('vhs') ?? 0,
-        };
+        // Mappa dei nomi puliti
+        const rawOptions = [
+          { name: 'TV', qty: interaction.options.getInteger('tv') ?? 0 },
+          { name: 'Stampante', qty: interaction.options.getInteger('stampante') ?? 0 },
+          { name: 'Microonde', qty: interaction.options.getInteger('microonde') ?? 0 },
+          { name: 'Caffettiera', qty: interaction.options.getInteger('caffettiera') ?? 0 },
+          { name: 'Laptop', qty: interaction.options.getInteger('laptop') ?? 0 },
+          { name: 'Audio System', qty: interaction.options.getInteger('audio_system') ?? 0 },
+          { name: 'Music Dock', qty: interaction.options.getInteger('music_dock') ?? 0 },
+          { name: 'Monitor', qty: interaction.options.getInteger('monitor') ?? 0 },
+          { name: 'Asciugacapelli', qty: interaction.options.getInteger('asciugacapelli') ?? 0 },
+          { name: 'Console', qty: interaction.options.getInteger('console') ?? 0 },
+          { name: 'Audio Mp3', qty: interaction.options.getInteger('audio_mp3') ?? 0 },
+          { name: 'Tostapane', qty: interaction.options.getInteger('tostapane') ?? 0 },
+          { name: 'Telescopio', qty: interaction.options.getInteger('telescopio') ?? 0 },
+          { name: 'Digital Scales', qty: interaction.options.getInteger('digital_scales') ?? 0 },
+          { name: 'Stand Mixer', qty: interaction.options.getInteger('stand_mixer') ?? 0 },
+          { name: 'Bollitore', qty: interaction.options.getInteger('bollitore') ?? 0 },
+          { name: 'VHS', qty: interaction.options.getInteger('vhs') ?? 0 }
+        ];
 
-        const totaleOggetti = Object.values(items).reduce((acc, curr) => acc + curr, 0);
+        // Trasformiamo la lista nel formato richiesto dal DB: Array di { name, quantity }
+        const itemsArray = rawOptions.map(item => ({
+          name: item.name,
+          quantity: item.qty
+        }));
 
+        // Calcolo del totale dei pezzi rubati
+        const totaleOggetti = itemsArray.reduce((acc, curr) => acc + curr.quantity, 0);
+
+        // Salvataggio nel DB con l'Array corretto
         await Furto.create({
           executorId: interaction.user.id,
           taggedUser: targetUser.id,
-          items: items,
+          items: itemsArray,
           totalItems: totaleOggetti,
           date: new Date()
         });
 
-        let riepilogo = Object.entries(items)
-          .filter(([_, qty]) => qty > 0)
-          .map(([name, qty]) => `• **${name}:** x${qty}`)
+        // Stringa di riepilogo solo con gli oggetti > 0 per pulizia visiva
+        const oggettiRubati = itemsArray.filter(i => i.quantity > 0);
+        let riepilogo = oggettiRubati
+          .map(i => `• **${i.name}:** x${i.quantity}`)
           .join('\n');
 
         if (!riepilogo) riepilogo = '_Nessun oggetto specificato (tutti a 0)_';
@@ -74,6 +84,7 @@ module.exports = [
         await interaction.editReply({ 
           content: `🕵️ **Furto registrato per ${targetUser}!**\n\n**Oggetti Rubati (Totale: ${totaleOggetti}):**\n${riepilogo}` 
         });
+
       } catch (err) {
         console.error('❌ Errore durante /furto:', err);
         await interaction.editReply({ content: `❌ Impossibile salvare il furto. Errore DB: \`${err.message}\`` });
