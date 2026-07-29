@@ -11,7 +11,6 @@ module.exports = [
     data: new SlashCommandBuilder()
       .setName('miniera')
       .setDescription('Registra un\'estrazione inserendo i minerali desiderati')
-      // ATTENZIONE: Il .setName() DEVE essere minuscolo per le regole di Discord!
       .addIntegerOption(opt => opt.setName('legno').setDescription('Quantità di Legno ($105/pz)').setRequired(false))
       .addIntegerOption(opt => opt.setName('pietra').setDescription('Quantità di Pietra ($75/pz)').setRequired(false))
       .addIntegerOption(opt => opt.setName('carbone').setDescription('Quantità di Carbone ($105/pz)').setRequired(false))
@@ -34,7 +33,10 @@ module.exports = [
       for (const mat of materiali) {
         const val = interaction.options.getInteger(mat);
         if (val !== null && val > 0) {
-          qty[mat] = val;
+          // Forziamo la chiave rigorosamente in minuscolo per MongoDB
+          const chiaveMinuscola = mat.toLowerCase();
+          qty[chiaveMinuscola] = val;
+
           const sub = val * PREZZI[mat];
           guadagnoTotale += sub;
           totalePezzi += val;
@@ -48,6 +50,7 @@ module.exports = [
         return await interaction.editReply({ content: '⚠️ Inserisci la quantità di **almeno un minerale**!' });
       }
 
+      // Salvataggio pulito con chiavi minuscole
       await Miniera.create({
         executorId: interaction.user.id,
         items: qty,
