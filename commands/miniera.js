@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models /Miniera.js'); // Fix del path (senza spazi extra)
+const Miniera = require('../Models /Miniera.js');
 
 // Listino prezzi al pezzo
 const PREZZI = {
@@ -57,20 +57,29 @@ module.exports = [
           guadagnoTotale += subtotale;
           totalePezzi += qta;
 
-          // Nome formattato con maiuscola
           const nomeFormattato = key.charAt(0).toUpperCase() + key.slice(1);
           dettagliTesto.push(`• **${nomeFormattato}:** x${qta} ($${subtotale.toLocaleString()})`);
         }
       }
 
+      // --- LOG DEBUG TERMINALE ---
+      console.log('--- DEBUG SALVATAGGIO MINIERA ---');
+      console.log('Executor ID:', interaction.user.id);
+      console.log('Qty estratta:', qty);
+      console.log('Totale pezzi:', totalePezzi);
+      console.log('Guadagno:', guadagnoTotale);
+
       // Salvataggio nel database
-      await Miniera.create({
+      const salvato = await Miniera.create({
         executorId: interaction.user.id,
         items: qty,
         totalItems: totalePezzi,
         totalEarnings: guadagnoTotale,
         date: new Date()
       });
+
+      console.log('Documento salvato nel DB:', salvato);
+      console.log('---------------------------------');
 
       const riepilogo = dettagliTesto.length > 0 
         ? dettagliTesto.join('\n') 
