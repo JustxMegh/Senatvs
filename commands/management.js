@@ -90,54 +90,50 @@ module.exports = [
         } 
 
         // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
-        // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
+       // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          // Leggiamo i documenti grezzi dal DB
+          // Leggiamo i documenti dal DB
           const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
             return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessuna consegna registrata.', components: [] });
           }
 
-          let testo = '⛏️ **Ultime Consegne Miniera (Chi ha portato cosa):**\n\n';
+          let testo = '⛏️ **Ultime Consegne Miniera:**\n\n';
 
           registrazioni.forEach((m, index) => {
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:F>`;
             
-            // Cerca l'ID utente provando tutti i possibili nomi usati nel codice
-            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId || m.idUtente;
+            // ID Utente
+            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Cerca l'oggetto items o gestisce materiali memorizzati come proprietà dirette
+            // Costruzione lista minerali uno sotto l'altro
             const itemsObj = m.items || m.materiali || m.qty || {};
             const dettagli = [];
-
-            // Se itemsObj è un oggetto vuoto, proviamo a cercare se le quantità sono salvate direttamente sul documento (es: m.legno)
             const listaMateriali = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
             
             for (const mat of listaMateriali) {
               const qta = Number(itemsObj[mat] !== undefined ? itemsObj[mat] : m[mat]) || 0;
               if (qta > 0) {
                 const nomeMat = mat.charAt(0).toUpperCase() + mat.slice(1);
-                dettagli.push(`${nomeMat}: **x${qta}**`);
+                dettagli.push(`**${nomeMat}:** ${qta}`);
               }
             }
 
-            const elencoOggetti = dettagli.length > 0 ? dettagli.join(' | ') : 'Nessun dettaglio';
-            const guadagnoNum = m.totalEarnings !== undefined ? m.totalEarnings : (m.guadagno || m.totale);
-            const valoreTotale = guadagnoNum !== undefined ? ` | Valore: **$${Number(guadagnoNum).toLocaleString()}**` : '';
+            const elencoOggetti = dettagli.length > 0 ? dettagli.join('\n') : 'Nessun dettaglio';
 
-            testo += `**${index + 1}.** ${utente} (Data: ${dateDisplay})${valoreTotale}\n`;
-            testo += `┗ 📦 **Ha portato:** ${elencoOggetti}\n\n`;
+            // Formattazione esatta richiesta: Utente - Data \n Ha portato: \n Minerali...
+            testo += `**${utente}** - ${dateDisplay}\n`;
+            testo += `**Ha portato:**\n${elencoOggetti}\n\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         }
-
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
           await i.deferUpdate();
