@@ -68,7 +68,7 @@ module.exports = [
         // --- SEZIONE FURTI ---
         if (selezione === 'lista_furti') {
           await i.deferUpdate();
-          const furti = await Furto.find().sort({ date: -1, createdAt: -1 }).limit(10);
+          const furti = await Furto.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
           
           if (!furti || furti.length === 0) {
             return await interaction.editReply({ content: '🕵️ **Lista Furti:** Nessun record trovato.', components: [] });
@@ -95,11 +95,12 @@ module.exports = [
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA (ELENCO COMPLETO MATERIALI) ---
+        // --- SEZIONE MINIERA ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10);
+          // .lean() legge direttamente l'oggetto JSON da MongoDB senza i vincoli dello schema Mongoose
+          const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
             return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessun record trovato.', components: [] });
@@ -112,17 +113,14 @@ module.exports = [
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
             
-            // Recupero Utente da executorId
-            const userId = m.executorId || m.userId || m.user || m.taggedUser;
+            // Lettura dell'utente che ha effettuato l'estrazione
+            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Estrazione oggetti da m.items (convertendo Mongoose Map se necessario)
-            let itemsObj = {};
-            if (m.items) {
-              itemsObj = m.items instanceof Map ? Object.fromEntries(m.items) : m.items;
-            }
+            // Estrazione dell'oggetto items
+            const itemsObj = m.items || {};
 
-            // Costruzione lista con tutti e 9 i materiali
+            // Mappatura completa per i 9 materiali
             const dettagliMinerali = LISTA_MINERALI_DEFAULT.map((mat) => {
               const qta = Number(itemsObj[mat]) || 0;
               return `${mat}: **${qta}**`;
@@ -141,7 +139,8 @@ module.exports = [
           await i.deferUpdate();
           const ultimeRapine = await Rapina.find()
             .sort({ date: -1, createdAt: -1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
           if (!ultimeRapine || ultimeRapine.length === 0) {
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
@@ -191,7 +190,7 @@ module.exports = [
     }
   },
 
-  // --- COMANDO RESET CON MENU OPZIONI ALL'AVVIO ---
+  // --- COMANDO RESET CON MENU A TENDINA ---
   {
     data: new SlashCommandBuilder()
       .setName('reset')
