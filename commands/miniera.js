@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models/Miniera.js');
+const Miniera = require('../Models /Miniera.js');
 
 // Listino prezzi al pezzo
 const PREZZI = {
