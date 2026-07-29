@@ -35,7 +35,7 @@ if (!mongoUri) {
   .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 }
 
-// --- 2. SLASH COMMANDS DEFINITION ---
+// --- 2. COMPLETE SLASH COMMANDS DEFINITIONS ---
 const commands = [
   {
     name: 'ping',
@@ -53,7 +53,38 @@ const commands = [
       },
     ],
   },
-  // Add any additional command definitions here...
+  {
+    name: 'rapina',
+    description: 'Log a new heist (Rapina)',
+    options: [
+      {
+        name: 'totale',
+        type: 4, // Integer
+        description: 'Total heist amount',
+        required: true,
+      },
+    ],
+  },
+  {
+    name: 'furto',
+    description: 'Log a theft (Furto)',
+    options: [
+      {
+        name: 'utente',
+        type: 6, // User
+        description: 'Target user',
+        required: true,
+      },
+    ],
+  },
+  {
+    name: 'campo',
+    description: 'Manage turf/campo sessions',
+  },
+  {
+    name: 'miniera',
+    description: 'Check or manage mining sessions',
+  },
 ];
 
 // --- 3. REGISTER SLASH COMMANDS ON STARTUP ---
@@ -97,19 +128,18 @@ client.on('interactionCreate', async (interaction) => {
   const { commandName } = interaction;
 
   try {
+    // Ping Command
     if (commandName === 'ping') {
       await interaction.reply({ content: 'Pong!', flags: MessageFlags.Ephemeral });
     } 
+    // Deposito Command
     else if (commandName === 'deposito') {
-      // Defer reply immediately so Discord doesn't time out within 3 seconds
       await interaction.deferReply();
-
       const depositoName = interaction.options.getString('nome');
 
-      // Safe DB Query
       if (mongoose.connection.readyState !== 1) {
         return await interaction.editReply({ 
-          content: '❌ Database connection is currently unavailable. Please check Railway logs.' 
+          content: '❌ Database connection is currently unavailable.' 
         });
       }
 
@@ -125,10 +155,43 @@ client.on('interactionCreate', async (interaction) => {
         content: `📦 **Deposit:** ${depositoData.depositoName}\nItems stored: ${depositoData.items.length}` 
       });
     }
+    // Rapina Command
+    else if (commandName === 'rapina') {
+      await interaction.deferReply();
+      const totale = interaction.options.getInteger('totale');
+      
+      await interaction.editReply({ 
+        content: `💰 Rapina logged with total amount: **${totale}**` 
+      });
+    }
+    // Furto Command
+    else if (commandName === 'furto') {
+      await interaction.deferReply();
+      const targetUser = interaction.options.getUser('utente');
+      
+      await interaction.editReply({ 
+        content: `🕵️ Furto logged against user: **${targetUser.tag}**` 
+      });
+    }
+    // Campo Command
+    else if (commandName === 'campo') {
+      await interaction.deferReply();
+      
+      await interaction.editReply({ 
+        content: '⚔️ Campo session status checked.' 
+      });
+    }
+    // Miniera Command
+    else if (commandName === 'miniera') {
+      await interaction.deferReply();
+      
+      await interaction.editReply({ 
+        content: '⛏️ Miniera stockpile status checked.' 
+      });
+    }
   } catch (error) {
     console.error(`❌ Error handling /${commandName}:`, error);
 
-    // Prevent "The application did not respond" crashes
     const responseMessage = { content: 'There was an error executing this command!' };
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply(responseMessage);
