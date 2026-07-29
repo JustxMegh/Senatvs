@@ -5,9 +5,9 @@ const {
   ComponentType 
 } = require('discord.js');
 
-const Furto = require('../Models/Furto.js');
-const Rapina = require('../Models/Rapina.js');
-const Miniera = require('../Models/Miniera.js');
+const Furto = require('../Models /Furto.js');
+const Rapina = require('../Models /Rapina.js');
+const Miniera = require('../Models /Miniera.js');
 
 const LISTA_MINERALI_DEFAULT = [
   'legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'
