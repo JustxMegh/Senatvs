@@ -89,7 +89,6 @@ module.exports = [
           await interaction.editReply({ content: testo, components: [] });
         } 
 
-        // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
        // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
@@ -101,18 +100,18 @@ module.exports = [
             return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessuna consegna registrata.', components: [] });
           }
 
-          let testo = '⛏️ **Ultime Consegne Miniera:**\n\n';
+          let testo = '⛏️ **Ultime Consegne Miniera (Chi ha portato cosa):**\n\n';
 
           registrazioni.forEach((m, index) => {
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:F>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
             
             // ID Utente
             const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Costruzione lista minerali uno sotto l'altro
+            // Costruzione lista minerali con il trattino per ogni riga
             const itemsObj = m.items || m.materiali || m.qty || {};
             const dettagli = [];
             const listaMateriali = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
@@ -121,15 +120,15 @@ module.exports = [
               const qta = Number(itemsObj[mat] !== undefined ? itemsObj[mat] : m[mat]) || 0;
               if (qta > 0) {
                 const nomeMat = mat.charAt(0).toUpperCase() + mat.slice(1);
-                dettagli.push(`**${nomeMat}:** ${qta}`);
+                dettagli.push(`- ${nomeMat}: ${qta}`);
               }
             }
 
-            const elencoOggetti = dettagli.length > 0 ? dettagli.join('\n') : 'Nessun dettaglio';
+            const elencoOggetti = dettagli.length > 0 ? dettagli.join('\n') : '- Nessun dettaglio';
 
-            // Formattazione esatta richiesta: Utente - Data \n Ha portato: \n Minerali...
-            testo += `**${utente}** - ${dateDisplay}\n`;
-            testo += `**Ha portato:**\n${elencoOggetti}\n\n`;
+            // Formattazione identica al tuo esempio
+            testo += `**${index + 1}.** ${utente} (Data: ${dateDisplay})\n`;
+            testo += `┗ 📦 **Ha portato:**\n${elencoOggetti}\n\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
