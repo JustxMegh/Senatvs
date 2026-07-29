@@ -4,11 +4,11 @@ const { Client, GatewayIntentBits, Collection, REST, Routes, MessageFlags } = re
 const mongoose = require('mongoose');
 
 // Import Mongoose Models
-const Rapina = require('./Models/Rapina.js');
-const Furto = require('./Models/Furto.js');
-const Deposito = require('./Models/Deposito.js');
-const Campo = require('./Models/Campo.js');
-const Miniera = require('./Models/Miniera.js');
+const Rapina = require('./Models /Rapina.js');
+const Furto = require('./Models /Furto.js');
+const Deposito = require('./Models /Deposito.js');
+const Campo = require('./Models /Campo.js');
+const Miniera = require('./Models /Miniera.js');
 
 // Initialize Discord Client
 const client = new Client({
