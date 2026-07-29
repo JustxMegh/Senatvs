@@ -117,10 +117,10 @@ module.exports = [
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          // 1. Prima si esegue lo split per ogni rapina e si sommano le quote individuali
           const guadagnoNettoUtenti = {};
           let totaleQuoteSplittate = 0;
 
+          // Processamento e split equo tra tutti i partecipanti presenti per ogni rapina
           tutteLeRapine.forEach(r => {
             const importoTotale = r.totalAmount || 0;
             const listaPartecipanti = (r.participants && r.participants.length > 0)
@@ -128,7 +128,6 @@ module.exports = [
               : (r.executorId ? [r.executorId] : []);
 
             if (listaPartecipanti.length > 0) {
-              // Calcolo della quota splittata equamente
               const quotaIndividuale = importoTotale / listaPartecipanti.length;
 
               listaPartecipanti.forEach(userId => {
@@ -138,7 +137,6 @@ module.exports = [
             }
           });
 
-          // Prendi le ultime 10 rapine ordinate per data
           const ultimeRapine = tutteLeRapine
             .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
             .slice(0, 10);
@@ -161,7 +159,6 @@ module.exports = [
             testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** (Quota: **$${quotaSingola.toFixed(2)}** x${numPartecipanti}) | Partecipanti: ${elencoPartecipantiText}${dateDisplay}\n`;
           });
 
-          // 2. La percentuale viene calcolata DOPO aver splittato, rapportando ciascuna quota al totale distribuito
           testo += `\n📊 **Percentuale di Contributo (dopo split delle quote):**\n`;
 
           const utentiOrdinati = Object.entries(guadagnoNettoUtenti)
