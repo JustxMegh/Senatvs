@@ -5,62 +5,89 @@ module.exports = [
   {
     data: new SlashCommandBuilder()
       .setName('rapina')
-      .setDescription('Registra una nuova rapina')
-      .addIntegerOption(opt => 
+      .setDescription('Registra una rapina e calcola la divisione delle quote')
+      .addNumberOption(opt => 
         opt.setName('totale')
-           .setDescription('Importo totale della rapina')
+           .setDescription('Importo totale della rapina ($)')
            .setRequired(true))
-      .addIntegerOption(opt => 
-        opt.setName('partecipanti')
-           .setDescription('Numero di persone che hanno partecipato')
-           .setRequired(true)),
+      .addUserOption(opt => 
+        opt.setName('partecipante1')
+           .setDescription('Primo partecipante (obbligatorio)')
+           .setRequired(true))
+      .addUserOption(opt => 
+        opt.setName('partecipante2')
+           .setDescription('Secondo partecipante')
+           .setRequired(false))
+      .addUserOption(opt => 
+        opt.setName('partecipante3')
+           .setDescription('Terzo partecipante')
+           .setRequired(false))
+      .addUserOption(opt => 
+        opt.setName('partecipante4')
+           .setDescription('Quarto partecipante')
+           .setRequired(false))
+      .addUserOption(opt => 
+        opt.setName('partecipante5')
+           .setDescription('Quinto partecipante')
+           .setRequired(false)),
+
     async execute(interaction) {
       await interaction.deferReply();
-      const totale = interaction.options.getInteger('totale');
-      const persone = interaction.options.getInteger('partecipanti');
-      
-      // Calcolo quota applicando il -70% diviso per i partecipanti
-      const totaleNetto = totale * 0.30;
-      const splitAmount = persone > 0 ? totaleNetto / persone : totaleNetto;
 
-      await Rapina.create({ 
-        executorId: interaction.user.id,
-        totalAmount: totale,
-        splitAmountPerUser: splitAmount,
-        date: new Date()
-      });
+      try {
+        const totalAmount = interaction.options.getNumber('totale');
 
-      await interaction.editReply({ 
-        content: `💰 **Rapina salvata!**\n• Totale: **$${totale.toLocaleString()}**\n• Partecipanti: **${persone}**\n• Quota a testa (-70%): **$${splitAmount.toFixed(2)}**` 
-      });
-    }
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('cancella')
-      .setDescription('Elimina una registrazione tramite ID')
-      .addStringOption(opt => 
-        opt.setName('id')
-           .setDescription('L\'ID del record da eliminare')
-           .setRequired(true)),
-    async execute(interaction) {
-      await interaction.deferReply();
-      const id = interaction.options.getString('id');
-      
-      const deleted = await Rapina.findByIdAndDelete(id);
-      if (!deleted) return await interaction.editReply({ content: `❌ Voce \`${id}\` non trovata.` });
-      
-      await interaction.editReply({ content: `🗑️ Voce \`${id}\` eliminata con successo.` });
+        // Raccolta di tutti i partecipanti inseriti
+        const participants = [];
+        for (let i = 1; i <= 5; i++) {
+          const user = interaction.options.getUser(`partecipante${i}`);
+          if (user && !participants.some(p => p.id === user.id)) {
+            participants.push(user);
+          }
+        }
+
+        const numParticipants = participants.length;
+        const splitAmount = totalAmount / numParticipants;
+
+        // Salvataggio nel database
+        await Rapina.create({
+          executorId: interaction.user.id,
+          totalAmount: totalAmount,
+          participants: participants.map(u => u.id),
+          splitAmountPerUser: splitAmount,
+          date: new Date()
+        });
+
+        const listaPartecipanti = participants.map(u => `<@${u.id}>`).join(', ');
+
+        await interaction.editReply({
+          content: `💰 **Rapina Registrata!**\n\n` +
+                   `• **Importo Totale:** $${totalAmount.toLocaleString()}\n` +
+                   `• **Partecipanti (${numParticipants}):** ${listaPartecipanti}\n` +
+                   `• **Quota a persona:** $${splitAmount.toFixed(2).toLocaleString()}`
+        });
+
+      } catch (err) {
+        console.error('❌ Errore durante /rapina:', err);
+        await interaction.editReply({ 
+          content: `❌ Si è verificato un errore durante la registrazione della rapina: \`${err.message}\`` 
+        });
+      }
     }
   },
   {
     data: new SlashCommandBuilder()
       .setName('rapinareset')
-      .setDescription('Azzera tutti i dati delle rapine'),
+      .setDescription('Azzera tutte le registrazioni delle rapine'),
     async execute(interaction) {
       await interaction.deferReply();
-      await Rapina.deleteMany({});
-      await interaction.editReply({ content: '🔄 Tutti i dati delle **Rapine** sono stati azzerati!' });
+      try {
+        await Rapina.deleteMany({});
+        await interaction.editReply({ content: '🔄 Tutti i dati delle **Rapine** sono stati azzerati!' });
+      } catch (err) {
+        console.error('❌ Errore durante /rapinareset:', err);
+        await interaction.editReply({ content: `❌ Impossibile azzerare i dati: \`${err.message}\`` });
+      }
     }
   }
 ];
