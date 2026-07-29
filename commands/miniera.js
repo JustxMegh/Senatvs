@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models/Miniera.js');
+const Miniera = require('../Models /Miniera.js');
 
 const PREZZI = {
   legno: 105, pietra: 75, carbone: 105, ferro: 135,
