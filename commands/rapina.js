@@ -37,7 +37,7 @@ module.exports = [
       try {
         const totalAmount = interaction.options.getNumber('totale');
 
-        // Estrazione sicura di tutti i partecipanti selezionati
+        // Raccolta dinamica di tutti i partecipanti unici inseriti
         const participantIds = [];
         for (let i = 1; i <= 5; i++) {
           const user = interaction.options.getUser(`partecipante${i}`);
@@ -48,8 +48,9 @@ module.exports = [
 
         const numParticipants = participantIds.length;
         const splitAmount = totalAmount / numParticipants;
+        const percIndividuale = (100 / numParticipants).toFixed(1);
 
-        // Salvataggio esplicito dell'array dei partecipanti nel DB
+        // Salvataggio nel DB
         await Rapina.create({
           executorId: interaction.user.id,
           totalAmount: totalAmount,
@@ -58,13 +59,15 @@ module.exports = [
           date: new Date()
         });
 
-        const listaPartecipantiText = participantIds.map(id => `<@${id}>`).join(', ');
+        // Formattazione partecipanti con la percentuale di ognuno
+        const listaDettagliata = participantIds
+          .map(id => `• <@${id}>: **${percIndividuale}%** ($${splitAmount.toFixed(2).toLocaleString()})`)
+          .join('\n');
 
         await interaction.editReply({
           content: `💰 **Rapina Registrata!**\n\n` +
-                   `• **Importo Totale:** $${totalAmount.toLocaleString()}\n` +
-                   `• **Partecipanti (${numParticipants}):** ${listaPartecipantiText}\n` +
-                   `• **Quota a persona:** $${splitAmount.toFixed(2).toLocaleString()}`
+                   `• **Totale:** **$${totalAmount.toLocaleString()}**\n` +
+                   `**Partecipanti:**\n${listaDettagliata}`
         });
 
       } catch (err) {
