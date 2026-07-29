@@ -36,7 +36,7 @@ module.exports = [
           },
           {
             label: 'Rapine',
-            description: 'Mostra i log e le percentuali sulle quote nette delle rapine',
+            description: 'Mostra i log e le percentuali sulle quote splittate',
             value: 'lista_rapine',
             emoji: '💰',
           },
@@ -117,11 +117,9 @@ module.exports = [
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          // Totale complessivo di tutti i bottini generati
-          const totaleGenerale = tutteLeRapine.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
-
-          // Tracciamento dei guadagni netti di ciascun utente (dopo la divisione equa)
+          // 1. Prima si esegue lo split per ogni rapina e si sommano le quote individuali
           const guadagnoNettoUtenti = {};
+          let totaleQuoteSplittate = 0;
 
           tutteLeRapine.forEach(r => {
             const importoTotale = r.totalAmount || 0;
@@ -130,11 +128,12 @@ module.exports = [
               : (r.executorId ? [r.executorId] : []);
 
             if (listaPartecipanti.length > 0) {
-              // Divisione equa dell'importo per il numero di partecipanti
+              // Calcolo della quota splittata equamente
               const quotaIndividuale = importoTotale / listaPartecipanti.length;
 
               listaPartecipanti.forEach(userId => {
                 guadagnoNettoUtenti[userId] = (guadagnoNettoUtenti[userId] || 0) + quotaIndividuale;
+                totaleQuoteSplittate += quotaIndividuale;
               });
             }
           });
@@ -144,7 +143,7 @@ module.exports = [
             .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
             .slice(0, 10);
 
-          let testo = `💰 **Ultime Rapine Registrate (Totale Generale Bottini: $${totaleGenerale.toLocaleString()}):**\n\n`;
+          let testo = `💰 **Ultime Rapine Registrate:**\n\n`;
 
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
@@ -162,18 +161,18 @@ module.exports = [
             testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** (Quota: **$${quotaSingola.toFixed(2)}** x${numPartecipanti}) | Partecipanti: ${elencoPartecipantiText}${dateDisplay}\n`;
           });
 
-          // Sezione Percentuali sul totale calcolate in base alla quota netta ricevuta da ciascuno
-          testo += `\n📊 **Guadagno Netto & Percentuale sul Totale per Partecipante:**\n`;
+          // 2. La percentuale viene calcolata DOPO aver splittato, rapportando ciascuna quota al totale distribuito
+          testo += `\n📊 **Percentuale di Contributo (dopo split delle quote):**\n`;
 
           const utentiOrdinati = Object.entries(guadagnoNettoUtenti)
             .sort(([, guadagnoA], [, guadagnoB]) => guadagnoB - guadagnoA);
 
           utentiOrdinati.forEach(([userId, guadagnoNetto]) => {
-            const percentuale = totaleGenerale > 0 
-              ? ((guadagnoNetto / totaleGenerale) * 100).toFixed(1) 
+            const percentuale = totaleQuoteSplittate > 0 
+              ? ((guadagnoNetto / totaleQuoteSplittate) * 100).toFixed(1) 
               : '0.0';
 
-            testo += `• <@${userId}>: **$${guadagnoNetto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}% del totale generato)\n`;
+            testo += `• <@${userId}>: **$${guadagnoNetto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}%)\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
