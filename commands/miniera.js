@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Miniera = require('../Models /Miniera.js');
+const Miniera = require('../Models/Miniera.js');
 
 // Listino prezzi al pezzo
 const PREZZI = {
@@ -18,21 +18,22 @@ module.exports = [
   {
     data: new SlashCommandBuilder()
       .setName('miniera')
-      .setDescription('Registra un\'estrazione specificando le quantità e calcola il guadagno')
-      .addIntegerOption(opt => opt.setName('legno').setDescription('Quantità di Legno ($105/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('pietra').setDescription('Quantità di Pietra ($75/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('carbone').setDescription('Quantità di Carbone ($105/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('ferro').setDescription('Quantità di Ferro ($135/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('argento').setDescription('Quantità di Argento ($155/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('rubino').setDescription('Quantità di Rubino ($185/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('oro').setDescription('Quantità di Oro ($215/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('smeraldo').setDescription('Quantità di Smeraldo ($245/pz)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('diamante').setDescription('Quantità di Diamante ($275/pz)').setRequired(true)),
+      .setDescription('Registra un\'estrazione inserendo i minerali desiderati')
+      // Tutti i campi ora sono OPZIONALI (.setRequired(false))
+      .addIntegerOption(opt => opt.setName('legno').setDescription('Quantità di Legno ($105/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('pietra').setDescription('Quantità di Pietra ($75/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('carbone').setDescription('Quantità di Carbone ($105/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('ferro').setDescription('Quantità di Ferro ($135/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('argento').setDescription('Quantità di Argento ($155/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('rubino').setDescription('Quantità di Rubino ($185/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('oro').setDescription('Quantità di Oro ($215/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('smeraldo').setDescription('Quantità di Smeraldo ($245/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('diamante').setDescription('Quantità di Diamante ($275/pz)').setRequired(false)),
 
     async execute(interaction) {
       await interaction.deferReply();
 
-      // Raccolta quantità inserite dall'utente
+      // Raccogliamo solo quello che l'utente ha inserito (default a 0 se non specificato)
       const qty = {
         legno: interaction.options.getInteger('legno') || 0,
         pietra: interaction.options.getInteger('pietra') || 0,
@@ -45,11 +46,11 @@ module.exports = [
         diamante: interaction.options.getInteger('diamante') || 0,
       };
 
-      // Calcolo guadagno per ciascun materiale e totale
       let guadagnoTotale = 0;
       let totalePezzi = 0;
       let dettagliTesto = [];
 
+      // Calcoliamo solo sui minerali > 0
       for (const [key, qta] of Object.entries(qty)) {
         if (qta > 0) {
           const prezzoSingolo = PREZZI[key];
@@ -62,15 +63,15 @@ module.exports = [
         }
       }
 
-      // --- LOG DEBUG TERMINALE ---
-      console.log('--- DEBUG SALVATAGGIO MINIERA ---');
-      console.log('Executor ID:', interaction.user.id);
-      console.log('Qty estratta:', qty);
-      console.log('Totale pezzi:', totalePezzi);
-      console.log('Guadagno:', guadagnoTotale);
+      // Se non ha inserito nessun minerale o tutti 0
+      if (totalePezzi === 0) {
+        return await interaction.editReply({
+          content: '⚠️ Devi inserire la quantità di almeno un minerale!'
+        });
+      }
 
       // Salvataggio nel database
-      const salvato = await Miniera.create({
+      await Miniera.create({
         executorId: interaction.user.id,
         items: qty,
         totalItems: totalePezzi,
@@ -78,16 +79,9 @@ module.exports = [
         date: new Date()
       });
 
-      console.log('Documento salvato nel DB:', salvato);
-      console.log('---------------------------------');
-
-      const riepilogo = dettagliTesto.length > 0 
-        ? dettagliTesto.join('\n') 
-        : '_Nessun materiale estratto (tutti a 0)_';
-
       await interaction.editReply({
         content: `⛏️ **Estrazione Registrata per ${interaction.user}!**\n\n` +
-                 `**Materiali estratti (Totale pezzi: ${totalePezzi}):**\n${riepilogo}\n\n` +
+                 `**Materiali estratti (Totale pezzi: ${totalePezzi}):**\n${dettagliTesto.join('\n')}\n\n` +
                  `💰 **Guadagno Totale:** **$${guadagnoTotale.toLocaleString()}**`
       });
     }
