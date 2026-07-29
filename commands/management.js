@@ -5,13 +5,9 @@ const {
   ComponentType 
 } = require('discord.js');
 
-const Furto = require('../Models /Furto.js');
-const Rapina = require('../Models /Rapina.js');
-const Miniera = require('../Models /Miniera.js');
-
-const LISTA_MINERALI_DEFAULT = [
-  'legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'
-];
+const Furto = require('../Models/Furto.js');
+const Rapina = require('../Models/Rapina.js');
+const Miniera = require('../Models/Miniera.js');
 
 module.exports = [
   {
@@ -33,7 +29,7 @@ module.exports = [
           },
           {
             label: 'Minerali / Miniera',
-            description: 'Mostra i dettagli di tutti i minerali raccolti',
+            description: 'Mostra chi ha portato cosa e il relativo valore',
             value: 'lista_miniera',
             emoji: '⛏️',
           },
@@ -75,11 +71,9 @@ module.exports = [
 
           let testo = '🕵️ **Ultimi 10 Furti Registrati:**\n\n';
           furti.forEach((f, index) => {
-            let totaleOggetti = 0;
+            let totaleOggetti = f.totalItems || 0;
             if (f.items && Array.isArray(f.items)) {
               totaleOggetti = f.items.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-            } else if (typeof f.totalItems === 'number') {
-              totaleOggetti = f.totalItems;
             }
 
             const userId = f.taggedUser || f.userId || f.user || f.executorId;
@@ -87,62 +81,67 @@ module.exports = [
 
             const rawDate = f.date || f.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? 'Data N/D' : `<t:${timestampSec}:R>`;
 
             testo += `**${index + 1}.** Vittima: ${utenteText} | Totale oggetti: **${totaleOggetti}** | Data: ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA ---
+
+        // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
+          // Utilizziamo .lean() per leggere l'oggetto JavaScript puro
           const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
-            return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessun record trovato.', components: [] });
+            return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessuna consegna registrata.', components: [] });
           }
 
-          let testo = '⛏️ **Ultime 10 Registrazioni Miniera:**\n\n';
+          let testo = '⛏️ **Ultime Consegne Miniera (Chi ha portato cosa):**\n\n';
 
           registrazioni.forEach((m, index) => {
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
             
-            const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
+            // ID di chi ha effettuato la registrazione
+            const userId = m.executorId || m.userId || m.user;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
+            // Costruiamo la lista dinamica di COSA ha portato l'utente
             const itemsObj = m.items || {};
+            const dettagli = [];
 
-            const dettagliMinerali = LISTA_MINERALI_DEFAULT.map((mat) => {
-              const qta = Number(itemsObj[mat]) || 0;
-              return `${mat}: **${qta}**`;
-            });
+            for (const [materiale, qta] of Object.entries(itemsObj)) {
+              if (qta > 0) {
+                const nomeMat = materiale.charAt(0).toUpperCase() + materiale.slice(1);
+                dettagli.push(`${nomeMat}: **x${qta}**`);
+              }
+            }
 
-            const guadagno = m.totalEarnings !== undefined ? ` | Guadagno: **$${m.totalEarnings.toLocaleString()}**` : '';
+            const elencoOggetti = dettagli.length > 0 ? dettagli.join(' | ') : 'Nessun dettaglio';
+            const valoreTotale = m.totalEarnings ? ` | Valore: **$${m.totalEarnings.toLocaleString()}**` : '';
 
-            testo += `**${index + 1}.** Utente: ${utente}${guadagno} | Data: ${dateDisplay}\n`;
-            testo += `┗ 📊 ${dettagliMinerali.join(' | ')}\n\n`;
+            testo += `**${index + 1}.** ${utente} (Data: ${dateDisplay})${valoreTotale}\n`;
+            testo += `┗ 📦 **Ha portato:** ${elencoOggetti}\n\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
         } 
+
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
           await i.deferUpdate();
-          const ultimeRapine = await Rapina.find()
-            .sort({ date: -1, createdAt: -1 })
-            .limit(10)
-            .lean();
+          const ultimeRapine = await Rapina.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!ultimeRapine || ultimeRapine.length === 0) {
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
           let testo = `💰 **Ultime Rapine Registrate:**\n\n`;
-
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
