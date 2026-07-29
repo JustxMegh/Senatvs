@@ -9,7 +9,7 @@ const Furto = require('../Models /Furto.js');
 const Rapina = require('../Models /Rapina.js');
 const Miniera = require('../Models /Miniera.js');
 
-// Elenco base dei minerali da mostrare sempre nel dettaglio
+// Elenco base dei minerali da mostrare nel dettaglio
 const LISTA_MINERALI_DEFAULT = ['ferro', 'rame', 'oro', 'diamante', 'smeraldo'];
 
 module.exports = [
@@ -106,26 +106,26 @@ module.exports = [
           let testo = '⛏️ **Ultime 10 Registrazioni Miniera:**\n\n';
 
           registrazioni.forEach((m, index) => {
+            // LOG TEMPORANEO NEL TERMINALE
+            console.log('--- DATI DOCUMENTO MINIERA DAL DB ---');
+            console.log(m.toObject ? m.toObject() : m);
+
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
             
-            // Verifica flessibile del campo utente
             const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Mappa per accumulare le quantità dei minerali trovati nel documento
             const mappaMinerali = {};
             LISTA_MINERALI_DEFAULT.forEach(min => mappaMinerali[min] = 0);
 
-            // 1. Controlla se il documento ha le proprietà direttamente sul root (es. m.ferro, m.rame)
             LISTA_MINERALI_DEFAULT.forEach((min) => {
               if (m[min] !== undefined && typeof m[min] === 'number') {
                 mappaMinerali[min] = m[min];
               }
             });
 
-            // 2. Controlla se i dati sono dentro un oggetto `m.minerali` o `m.items` (Mongoose Map o Plain Object)
             if (m.minerali) {
               const objMinerali = m.minerali instanceof Map ? Object.fromEntries(m.minerali) : m.minerali;
               Object.keys(objMinerali).forEach((k) => {
@@ -136,7 +136,6 @@ module.exports = [
               });
             }
 
-            // 3. Controlla se i dati sono in un Array di oggetti (es. [{ name: 'ferro', quantity: 5 }])
             const itemsArray = m.items || m.minerals || m.lista;
             if (Array.isArray(itemsArray)) {
               itemsArray.forEach((item) => {
@@ -148,7 +147,6 @@ module.exports = [
               });
             }
 
-            // 4. Se salvato come minerale singolo (es. m.mineralType = 'ferro', m.quantity = 5)
             if (m.mineralType && m.quantity !== undefined) {
               const typeLower = m.mineralType.toLowerCase();
               if (mappaMinerali.hasOwnProperty(typeLower)) {
@@ -156,7 +154,6 @@ module.exports = [
               }
             }
 
-            // Costruisci la stringa con il resoconto completo
             const dettagliMinerali = LISTA_MINERALI_DEFAULT.map(
               min => `${min}: **${mappaMinerali[min]}**`
             );
@@ -221,17 +218,97 @@ module.exports = [
       await interaction.editReply({ content: `🔄 Sezione **${sezione}** aggiornata!` });
     }
   },
+
+  // --- COMANDO RESET CON MENU A TENDINA ---
   {
     data: new SlashCommandBuilder()
       .setName('reset')
-      .setDescription('Reset di un modulo di sistema')
-      .addStringOption(opt => opt.setName('modulo').setDescription('Nome del modulo da azzerare').setRequired(true)),
+      .setDescription('Azzera i dati registrati di un modulo o del database'),
     async execute(interaction) {
       await interaction.deferReply();
-      const modulo = interaction.options.getString('modulo');
-      await interaction.editReply({ content: `⚙️ Modulo **${modulo}** azzerato!` });
+
+      const resetMenu = new StringSelectMenuBuilder()
+        .setCustomId('select_reset_modulo')
+        .setPlaceholder('Seleziona la sezione che vuoi azzerare...')
+        .addOptions([
+          {
+            label: 'Reset Furti',
+            description: 'Elimina tutte le registrazioni dei furti',
+            value: 'reset_furti',
+            emoji: '🗑️',
+          },
+          {
+            label: 'Reset Miniera / Minerali',
+            description: 'Elimina tutti i log di estrazione mineraria',
+            value: 'reset_miniera',
+            emoji: '⛏️',
+          },
+          {
+            label: 'Reset Rapine',
+            description: 'Elimina tutte le registrazioni delle rapine',
+            value: 'reset_rapine',
+            emoji: '💰',
+          },
+          {
+            label: 'Reset Completo (Tutti i dati)',
+            description: '⚠️ AZZERA TUTTI I DATI (Furti, Rapine, Miniera)',
+            value: 'reset_tutto',
+            emoji: '⚠️',
+          },
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(resetMenu);
+
+      const response = await interaction.editReply({
+        content: '⚙️ **Seleziona quale sezione del database desideri azzerare:**',
+        components: [row],
+      });
+
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.StringSelect,
+        time: 60000,
+      });
+
+      collector.on('collect', async (i) => {
+        if (i.user.id !== interaction.user.id) {
+          return await i.reply({ content: '❌ Non puoi interagire con questo menu.', flags: 64 });
+        }
+
+        await i.deferUpdate();
+        const scelta = i.values[0];
+
+        try {
+          if (scelta === 'reset_furti') {
+            await Furto.deleteMany({});
+            await interaction.editReply({ content: '✅ **Reset completato:** Tutte le registrazioni dei **Furti** sono state eliminate!', components: [] });
+          } else if (scelta === 'reset_miniera') {
+            await Miniera.deleteMany({});
+            await interaction.editReply({ content: '✅ **Reset completato:** Tutti i log della **Miniera** sono stati eliminati!', components: [] });
+          } else if (scelta === 'reset_rapine') {
+            await Rapina.deleteMany({});
+            await interaction.editReply({ content: '✅ **Reset completato:** Tutte le registrazioni delle **Rapine** sono state eliminate!', components: [] });
+          } else if (scelta === 'reset_tutto') {
+            await Promise.all([
+              Furto.deleteMany({}),
+              Miniera.deleteMany({}),
+              Rapina.deleteMany({})
+            ]);
+            await interaction.editReply({ content: '⚠️ **Reset generale completato:** Tutti i dati (Furti, Rapine e Miniera) sono stati azzerati con successo!', components: [] });
+          }
+        } catch (error) {
+          console.error('Errore durante il reset:', error);
+          await interaction.editReply({ content: '❌ Si è verificato un errore durante l\'azzeramento dei dati nel database.', components: [] });
+        }
+      });
+
+      collector.on('end', async (collected, reason) => {
+        if (reason === 'time' && collected.size === 0) {
+          await interaction.editReply({ content: '⏱️ Tempo scaduto per selezionare l\'opzione di reset.', components: [] });
+        }
+      });
     }
   },
+
   {
     data: new SlashCommandBuilder()
       .setName('modifica')
