@@ -118,27 +118,6 @@ module.exports = [
           const guadagnoNettoUtenti = {};
           let totaleQuoteSplittate = 0;
 
-          tutteLeRapine.forEach(r => {
-            const importoTotale = r.totalAmount || 0;
-            
-            // Garantisce la lettura corretta dei partecipanti registrati
-            let listaPartecipanti = [];
-            if (Array.isArray(r.participants) && r.participants.length > 0) {
-              listaPartecipanti = r.participants;
-            } else if (r.executorId) {
-              listaPartecipanti = [r.executorId];
-            }
-
-            if (listaPartecipanti.length > 0) {
-              const quotaIndividuale = importoTotale / listaPartecipanti.length;
-
-              listaPartecipanti.forEach(userId => {
-                guadagnoNettoUtenti[userId] = (guadagnoNettoUtenti[userId] || 0) + quotaIndividuale;
-                totaleQuoteSplittate += quotaIndividuale;
-              });
-            }
-          });
-
           const ultimeRapine = tutteLeRapine
             .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
             .slice(0, 10);
@@ -148,7 +127,7 @@ module.exports = [
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : ` | <t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
 
             let listaPartecipanti = [];
             if (Array.isArray(r.participants) && r.participants.length > 0) {
@@ -156,15 +135,27 @@ module.exports = [
             } else if (r.executorId) {
               listaPartecipanti = [r.executorId];
             }
-            
-            const numPartecipanti = listaPartecipanti.length;
-            const quotaSingola = numPartecipanti > 0 ? (r.totalAmount || 0) / numPartecipanti : 0;
-            const elencoPartecipantiText = listaPartecipanti.map(p => `<@${p}>`).join(', ');
 
-            testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** (Quota: **$${quotaSingola.toFixed(2)}** x${numPartecipanti}) | Partecipanti: ${elencoPartecipantiText}${dateDisplay}\n`;
+            const importoTotale = r.totalAmount || 0;
+            const numPartecipanti = listaPartecipanti.length;
+            const percIndividuale = numPartecipanti > 0 ? (100 / numPartecipanti).toFixed(0) : 0;
+            const quotaSingola = numPartecipanti > 0 ? importoTotale / numPartecipanti : 0;
+
+            // Aggiorna anche il bilancio generale per il riepilogo in fondo
+            listaPartecipanti.forEach(uId => {
+              guadagnoNettoUtenti[uId] = (guadagnoNettoUtenti[uId] || 0) + quotaSingola;
+              totaleQuoteSplittate += quotaSingola;
+            });
+
+            testo += `**${index + 1}.** Totale: **$${importoTotale.toLocaleString()}** | ${dateDisplay}\n`;
+            testo += `**Partecipanti:**\n`;
+            listaPartecipanti.forEach(p => {
+              testo += `• <@${p}>: **${percIndividuale}%**\n`;
+            });
+            testo += `\n`;
           });
 
-          testo += `\n📊 **Percentuale di Contributo (dopo split delle quote):**\n`;
+          testo += `📊 **Percentuale di Contributo Totale (dopo split delle quote):**\n`;
 
           const utentiOrdinati = Object.entries(guadagnoNettoUtenti)
             .sort(([, guadagnoA], [, guadagnoB]) => guadagnoB - guadagnoA);
