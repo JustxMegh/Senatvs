@@ -17,7 +17,7 @@ module.exports = [
     async execute(interaction) {
       await interaction.deferReply();
 
-      // 1. Creazione del menu a tendina
+      // 1. Menu a tendina per selezione categoria
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('select_lista_categoria')
         .setPlaceholder('Seleziona la lista che vuoi visualizzare...')
@@ -49,14 +49,13 @@ module.exports = [
         components: [row],
       });
 
-      // 2. Ascolto della selezione dell'utente (valido per 60 secondi)
+      // 2. Ascolto interazione menu
       const collector = response.createMessageComponentCollector({
         componentType: ComponentType.StringSelect,
         time: 60000,
       });
 
       collector.on('collect', async (i) => {
-        // Verifica che sia l'utente che ha digitato il comando a rispondere
         if (i.user.id !== interaction.user.id) {
           return await i.reply({ content: '❌ Non puoi interagire con questo menu.', flags: 64 });
         }
@@ -88,7 +87,7 @@ module.exports = [
 
           let testo = '⛏️ **Ultimi 10 Log Miniera:**\n\n';
           miniera.forEach((m, index) => {
-            testo += `**${index + 1}.** Utente: <@${m.executorId || m.userId}> | Dettagli: ${m.details || 'N/D'}\n`;
+            testo += `**${index + 1}.** Utente: <@${m.executorId}> | Pezzi: **${m.totalItems || 0}** | Guadagno: **$${m.totalEarnings ? m.totalEarnings.toLocaleString() : 0}**\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
