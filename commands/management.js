@@ -17,7 +17,6 @@ module.exports = [
     async execute(interaction) {
       await interaction.deferReply();
 
-      // 1. Menu a tendina per la selezione della categoria
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('select_lista_categoria')
         .setPlaceholder('Seleziona la lista che vuoi visualizzare...')
@@ -49,7 +48,6 @@ module.exports = [
         components: [row],
       });
 
-      // 2. Ascolto delle selezioni dall'utente
       const collector = response.createMessageComponentCollector({
         componentType: ComponentType.StringSelect,
         time: 60000,
@@ -120,12 +118,16 @@ module.exports = [
           const guadagnoNettoUtenti = {};
           let totaleQuoteSplittate = 0;
 
-          // Processamento e split equo tra tutti i partecipanti presenti per ogni rapina
           tutteLeRapine.forEach(r => {
             const importoTotale = r.totalAmount || 0;
-            const listaPartecipanti = (r.participants && r.participants.length > 0)
-              ? r.participants
-              : (r.executorId ? [r.executorId] : []);
+            
+            // Garantisce la lettura corretta dei partecipanti registrati
+            let listaPartecipanti = [];
+            if (Array.isArray(r.participants) && r.participants.length > 0) {
+              listaPartecipanti = r.participants;
+            } else if (r.executorId) {
+              listaPartecipanti = [r.executorId];
+            }
 
             if (listaPartecipanti.length > 0) {
               const quotaIndividuale = importoTotale / listaPartecipanti.length;
@@ -148,9 +150,12 @@ module.exports = [
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? '' : ` | <t:${timestampSec}:R>`;
 
-            const listaPartecipanti = (r.participants && r.participants.length > 0)
-              ? r.participants
-              : (r.executorId ? [r.executorId] : []);
+            let listaPartecipanti = [];
+            if (Array.isArray(r.participants) && r.participants.length > 0) {
+              listaPartecipanti = r.participants;
+            } else if (r.executorId) {
+              listaPartecipanti = [r.executorId];
+            }
             
             const numPartecipanti = listaPartecipanti.length;
             const quotaSingola = numPartecipanti > 0 ? (r.totalAmount || 0) / numPartecipanti : 0;
