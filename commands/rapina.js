@@ -16,19 +16,19 @@ module.exports = [
            .setRequired(true))
       .addUserOption(opt => 
         opt.setName('partecipante2')
-           .setDescription('Secondo partecipante')
+           .setDescription('Secondo partecipante (opzionale)')
            .setRequired(false))
       .addUserOption(opt => 
         opt.setName('partecipante3')
-           .setDescription('Terzo partecipante')
+           .setDescription('Terzo partecipante (opzionale)')
            .setRequired(false))
       .addUserOption(opt => 
         opt.setName('partecipante4')
-           .setDescription('Quarto partecipante')
+           .setDescription('Quarto partecipante (opzionale)')
            .setRequired(false))
       .addUserOption(opt => 
         opt.setName('partecipante5')
-           .setDescription('Quinto partecipante')
+           .setDescription('Quinto partecipante (opzionale)')
            .setRequired(false)),
 
     async execute(interaction) {
@@ -37,7 +37,7 @@ module.exports = [
       try {
         const totalAmount = interaction.options.getNumber('totale');
 
-        // Raccolta di tutti i partecipanti inseriti
+        // Raccolta dinamica di tutti i partecipanti inseriti (senza duplicati)
         const participants = [];
         for (let i = 1; i <= 5; i++) {
           const user = interaction.options.getUser(`partecipante${i}`);
@@ -49,7 +49,7 @@ module.exports = [
         const numParticipants = participants.length;
         const splitAmount = totalAmount / numParticipants;
 
-        // Salvataggio nel database
+        // Salvataggio nel database con la lista completa dei partecipanti
         await Rapina.create({
           executorId: interaction.user.id,
           totalAmount: totalAmount,
