@@ -36,7 +36,7 @@ module.exports = [
           },
           {
             label: 'Rapine',
-            description: 'Mostra i log e le percentuali di contributo delle rapine',
+            description: 'Mostra i log e le percentuali sulle quote nette delle rapine',
             value: 'lista_rapine',
             emoji: '💰',
           },
@@ -117,56 +117,63 @@ module.exports = [
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          // Calcolo totale globale accumulato da tutte le rapine
+          // Totale complessivo di tutti i bottini generati
           const totaleGenerale = tutteLeRapine.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
 
-          // Calcolo totale accreditato a ciascun utente
-          const contributoUtenti = {};
+          // Tracciamento dei guadagni netti di ciascun utente (dopo la divisione equa)
+          const guadagnoNettoUtenti = {};
 
           tutteLeRapine.forEach(r => {
-            const importo = r.totalAmount || 0;
+            const importoTotale = r.totalAmount || 0;
             const listaPartecipanti = (r.participants && r.participants.length > 0)
               ? r.participants
               : (r.executorId ? [r.executorId] : []);
 
             if (listaPartecipanti.length > 0) {
-              const quotaSingola = importo / listaPartecipanti.length;
+              // Divisione equa dell'importo per il numero di partecipanti
+              const quotaIndividuale = importoTotale / listaPartecipanti.length;
+
               listaPartecipanti.forEach(userId => {
-                contributoUtenti[userId] = (contributoUtenti[userId] || 0) + quotaSingola;
+                guadagnoNettoUtenti[userId] = (guadagnoNettoUtenti[userId] || 0) + quotaIndividuale;
               });
             }
           });
 
-          // Creazione testo per ultime 10 rapine
+          // Prendi le ultime 10 rapine ordinate per data
           const ultimeRapine = tutteLeRapine
             .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
             .slice(0, 10);
 
-          let testo = `💰 **Ultime Rapine Registrate (Totale Globale: $${totaleGenerale.toLocaleString()}):**\n\n`;
+          let testo = `💰 **Ultime Rapine Registrate (Totale Generale Bottini: $${totaleGenerale.toLocaleString()}):**\n\n`;
 
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? '' : ` | <t:${timestampSec}:R>`;
 
-            const elencoPartecipanti = (r.participants && r.participants.length > 0)
-              ? r.participants.map(p => `<@${p}>`).join(', ')
-              : `<@${r.executorId}>`;
+            const listaPartecipanti = (r.participants && r.participants.length > 0)
+              ? r.participants
+              : (r.executorId ? [r.executorId] : []);
+            
+            const numPartecipanti = listaPartecipanti.length;
+            const quotaSingola = numPartecipanti > 0 ? (r.totalAmount || 0) / numPartecipanti : 0;
+            const elencoPartecipantiText = listaPartecipanti.map(p => `<@${p}>`).join(', ');
 
-            testo += `**${index + 1}.** Importo: **$${(r.totalAmount || 0).toLocaleString()}** | Partecipanti: ${elencoPartecipanti}${dateDisplay}\n`;
+            testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** (Quota: **$${quotaSingola.toFixed(2)}** x${numPartecipanti}) | Partecipanti: ${elencoPartecipantiText}${dateDisplay}\n`;
           });
 
-          // Sezione Percentuali di Contributo per Utente
-          testo += `\n📊 **Contributo e Percentuali sul Totale:**\n`;
+          // Sezione Percentuali sul totale calcolate in base alla quota netta ricevuta da ciascuno
+          testo += `\n📊 **Guadagno Netto & Percentuale sul Totale per Partecipante:**\n`;
 
-          const utentiOrdinati = Object.entries(contributoUtenti)
-            .sort(([, totalA], [, totalB]) => totalB - totalA);
+          const utentiOrdinati = Object.entries(guadagnoNettoUtenti)
+            .sort(([, guadagnoA], [, guadagnoB]) => guadagnoB - guadagnoA);
 
-          utentiOrdinati.forEach(([userId, importoGenerato]) => {
+          utentiOrdinati.forEach(([userId, guadagnoNetto]) => {
             const percentuale = totaleGenerale > 0 
-              ? ((importoGenerato / totaleGenerale) * 100).toFixed(1) 
+              ? ((guadagnoNetto / totaleGenerale) * 100).toFixed(1) 
               : '0.0';
-            testo += `• <@${userId}>: **$${importoGenerato.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}%)\n`;
+
+            testo += `• <@${userId}>: **$${guadagnoNetto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}% del totale generato)\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
