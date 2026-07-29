@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Furto = require('../Models/Furto.js');
+const Furto = require('../Models /Furto.js');
 
 module.exports = [
   {
