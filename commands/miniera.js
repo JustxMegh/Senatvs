@@ -2,8 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const Miniera = require('../Models /Miniera.js');
 
 const PREZZI = {
-  legno: 105, pietra: 75, carbone: 105, ferro: 135,
-  argento: 155, rubino: 185, oro: 215, smeraldo: 245, diamante: 275
+  Legno: 105, Pietra: 75, Carbone: 105, Ferro: 135,
+  Argento: 155, Rubino: 185, Oro: 215, Smeraldo: 245, Diamante: 275
 };
 
 module.exports = [
@@ -11,20 +11,20 @@ module.exports = [
     data: new SlashCommandBuilder()
       .setName('miniera')
       .setDescription('Registra un\'estrazione inserendo i minerali desiderati')
-      .addIntegerOption(opt => opt.setName('legno').setDescription('Quantità Legno ($105)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('pietra').setDescription('Quantità Pietra ($75)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('carbone').setDescription('Quantità Carbone ($105)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('ferro').setDescription('Quantità Ferro ($135)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('argento').setDescription('Quantità Argento ($155)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('rubino').setDescription('Quantità Rubino ($185)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('oro').setDescription('Quantità Oro ($215)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('smeraldo').setDescription('Quantità Smeraldo ($245)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('diamante').setDescription('Quantità Diamante ($275)').setRequired(false)),
+      .addIntegerOption(opt => opt.setName('Legno').setDescription('Quantità di Legno ($105/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Pietra').setDescription('Quantità di Pietra ($75/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Carbone').setDescription('Quantità di Carbone ($105/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Ferro').setDescription('Quantità di Ferro ($135/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Argento').setDescription('Quantità di Argento ($155/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Rubino').setDescription('Quantità di Rubino ($185/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Oro').setDescription('Quantità di Oro ($215/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Smeraldo').setDescription('Quantità di Smeraldo ($245/pz)').setRequired(false))
+      .addIntegerOption(opt => opt.setName('Diamante').setDescription('Quantità di Diamante ($275/pz)').setRequired(false)),
 
     async execute(interaction) {
       await interaction.deferReply();
 
-      const materiali = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
+      const materiali = ['Legno', 'Pietra', 'Carbone', 'Ferro', 'Argento', 'Rubino', 'Oro', 'Smeraldo', 'Diamante'];
       const qty = {};
       let guadagnoTotale = 0;
       let totalePezzi = 0;
@@ -37,7 +37,10 @@ module.exports = [
           const sub = val * PREZZI[mat];
           guadagnoTotale += sub;
           totalePezzi += val;
-          resoconto.push(`• **${mat.charAt(0).toUpperCase() + mat.slice(1)}:** x${val} ($${sub.toLocaleString()})`);
+          
+          // La prima lettera diventa maiuscola nel resoconto
+          const nomeFormattato = mat.charAt(0).toUpperCase() + mat.slice(1);
+          resoconto.push(`• **${nomeFormattato}:** x${val} ($${sub.toLocaleString()})`);
         }
       }
 
@@ -45,7 +48,6 @@ module.exports = [
         return await interaction.editReply({ content: '⚠️ Inserisci la quantità di **almeno un minerale**!' });
       }
 
-      // SALVIAMO L'ID UTENTE ESPLICITAMENTE
       await Miniera.create({
         executorId: interaction.user.id,
         items: qty,
