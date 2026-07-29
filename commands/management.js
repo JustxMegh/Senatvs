@@ -35,7 +35,7 @@ module.exports = [
           },
           {
             label: 'Rapine',
-            description: 'Mostra i log e le percentuali sulle quote splittate',
+            description: 'Mostra i log delle rapine registrate',
             value: 'lista_rapine',
             emoji: '💰',
           },
@@ -109,61 +109,22 @@ module.exports = [
         } 
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
-          const tutteLeRapine = await Rapina.find();
+          const ultimeRapine = await Rapina.find()
+            .sort({ date: -1, createdAt: -1 })
+            .limit(10);
 
-          if (!tutteLeRapine || tutteLeRapine.length === 0) {
+          if (!ultimeRapine || ultimeRapine.length === 0) {
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          const guadagnoNettoUtenti = {};
-          let totaleQuoteSplittate = 0;
+          let testo = `💰 **Ultima Rapina / Ultime Rapine Registrate:**\n\n`;
 
-          // Calcola il bilancio totale spalmato su tutti i partecipanti di ogni rapina
-          tutteLeRapine.forEach(r => {
-            const importoTotale = r.totalAmount || 0;
-            let listaPartecipanti = [];
-            
-            if (Array.isArray(r.participants) && r.participants.length > 0) {
-              listaPartecipanti = r.participants;
-            } else if (r.executorId) {
-              listaPartecipanti = [r.executorId];
-            }
-
-            if (listaPartecipanti.length > 0) {
-              const quotaSingola = importoTotale / listaPartecipanti.length;
-              listaPartecipanti.forEach(uId => {
-                guadagnoNettoUtenti[uId] = (guadagnoNettoUtenti[uId] || 0) + quotaSingola;
-                totaleQuoteSplittate += quotaSingola;
-              });
-            }
-          });
-
-          const ultimeRapine = tutteLeRapine
-            .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
-            .slice(0, 10);
-
-          let testo = `💰 **Ultime Rapine Registrate:**\n\n`;
-
-          // Mostra solo il totale e la data delle ultime 10 rapine (senza l'elenco dei partecipanti sotto ognuna)
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? '' : `| <t:${timestampSec}:R>`;
 
             testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** ${dateDisplay}\n`;
-          });
-
-          testo += `\n📊 **Percentuale di Contributo Totale (dopo split delle quote):**\n`;
-
-          const utentiOrdinati = Object.entries(guadagnoNettoUtenti)
-            .sort(([, guadagnoA], [, guadagnoB]) => guadagnoB - guadagnoA);
-
-          utentiOrdinati.forEach(([userId, guadagnoNetto]) => {
-            const percentuale = totaleQuoteSplittate > 0 
-              ? ((guadagnoNetto / totaleQuoteSplittate) * 100).toFixed(1) 
-              : '0.0';
-
-            testo += `• <@${userId}>: **$${guadagnoNetto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${percentuale}%)\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
