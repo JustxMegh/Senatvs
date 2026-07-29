@@ -9,6 +9,16 @@ const Furto = require('../Models /Furto.js');
 const Rapina = require('../Models /Rapina.js');
 const Miniera = require('../Models /Miniera.js');
 
+// Lista dei minerali disponibili con opzione 0 inclusa
+const OPZIONI_MINERALI = [
+  { label: 'Nessun Minerale (0)', value: '0', description: 'Imposta la quantità a 0', emoji: '❌' },
+  { label: 'Ferro', value: 'ferro', description: 'Minerali di ferro raccolti', emoji: '🪨' },
+  { label: 'Rame', value: 'rame', description: 'Minerali di rame raccolti', emoji: '🟠' },
+  { label: 'Oro', value: 'oro', description: 'Pepite d\'oro raccolte', emoji: '🟡' },
+  { label: 'Diamante', value: 'diamante', description: 'Diamanti grezzi trovati', emoji: '💎' },
+  { label: 'Smeraldo', value: 'smeraldo', description: 'Smeraldi trovati', emoji: '🟢' }
+];
+
 module.exports = [
   {
     data: new SlashCommandBuilder()
@@ -29,7 +39,7 @@ module.exports = [
           },
           {
             label: 'Minerali / Miniera',
-            description: 'Mostra i log delle estrazioni e della miniera',
+            description: 'Seleziona ed elenca i minerali raccolti',
             value: 'lista_miniera',
             emoji: '⛏️',
           },
@@ -58,12 +68,11 @@ module.exports = [
           return await i.reply({ content: '❌ Non puoi interagire con questo menu.', flags: 64 });
         }
 
-        await i.deferUpdate();
-
         const selezione = i.values[0];
 
         // --- SEZIONE FURTI ---
         if (selezione === 'lista_furti') {
+          await i.deferUpdate();
           const furti = await Furto.find().sort({ date: -1, createdAt: -1 }).limit(10);
           
           if (!furti || furti.length === 0) {
@@ -88,30 +97,85 @@ module.exports = [
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA (Formattata come i Furti) ---
+        // --- SEZIONE MINIERA (Menu Selezione Minerali) ---
         else if (selezione === 'lista_miniera') {
-          const miniera = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10);
+          await i.deferUpdate();
 
-          if (!miniera || miniera.length === 0) {
-            return await interaction.editReply({ content: '⛏️ **Lista Minerali/Miniera:** Nessun record trovato.', components: [] });
-          }
+          // Sottomenu per selezionare lo specifico minerale (inclusa opzione 0)
+          const mineraliMenu = new StringSelectMenuBuilder()
+            .setCustomId('select_minerale_tipo')
+            .setPlaceholder('Seleziona il minerale da filtrare...')
+            .addOptions(OPZIONI_MINERALI);
 
-          let testo = '⛏️ **Ultimi 10 Log Miniera Registrati:**\n\n';
-          miniera.forEach((m, index) => {
-            const rawDate = m.date || m.createdAt || new Date();
-            const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+          const mineraliRow = new ActionRowBuilder().addComponents(mineraliMenu);
 
-            const guadagno = m.totalEarnings ? m.totalEarnings.toLocaleString() : '0';
-            const utente = m.executorId ? `<@${m.executorId}>` : 'Sconosciuto';
-
-            testo += `**${index + 1}.** Utente: ${utente} | Totale guadagno: **$${guadagno}** | Data: ${dateDisplay}\n`;
+          const minieraResponse = await interaction.editReply({
+            content: '⛏️ **Seleziona il minerale di cui vuoi consultare la raccolta:**',
+            components: [mineraliRow],
           });
 
-          await interaction.editReply({ content: testo, components: [] });
+          const subCollector = minieraResponse.createMessageComponentCollector({
+            componentType: ComponentType.StringSelect,
+            time: 60000,
+          });
+
+          subCollector.on('collect', async (subInt) => {
+            if (subInt.user.id !== interaction.user.id) {
+              return await subInt.reply({ content: '❌ Non puoi interagire con questo menu.', flags: 64 });
+            }
+
+            await subInt.deferUpdate();
+            const mineraleScelto = subInt.values[0];
+
+            // Gestione opzione 0 (Nessun minerale)
+            if (mineraleScelto === '0') {
+              return await interaction.editReply({ 
+                content: '⛏️ **Selezione Minerale:** Hai selezionato **0 / Nessun minerale**. Nessun filtro applicato.', 
+                components: [] 
+              });
+            }
+
+            // Ricerca nel DB per il minerale specifico
+            const registrazioni = await Miniera.find({ 
+              $or: [
+                { 'items.name': mineraleScelto },
+                { 'mineralType': mineraleScelto }
+              ]
+            }).sort({ date: -1, createdAt: -1 }).limit(10);
+
+            if (!registrazioni || registrazioni.length === 0) {
+              return await interaction.editReply({ 
+                content: `⛏️ **Lista Miniera (${mineraleScelto}):** Nessun record trovato per questo minerale.`, 
+                components: [] 
+              });
+            }
+
+            let testo = `⛏️ **Ultimi 10 Log per il minerale: ${mineraleScelto.toUpperCase()}**\n\n`;
+            registrazioni.forEach((m, index) => {
+              const rawDate = m.date || m.createdAt || new Date();
+              const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
+              const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+
+              const utente = m.executorId ? `<@${m.executorId}>` : 'Sconosciuto';
+              
+              // Estrazione quantità specifica
+              let quantita = 0;
+              if (m.items && Array.isArray(m.items)) {
+                const itemFound = m.items.find(i => i.name === mineraleScelto);
+                if (itemFound) quantita = itemFound.quantity || 0;
+              } else if (m.quantity) {
+                quantita = m.quantity;
+              }
+
+              testo += `**${index + 1}.** Utente: ${utente} | Quantità: **${quantita}** | Data: ${dateDisplay}\n`;
+            });
+
+            await interaction.editReply({ content: testo, components: [] });
+          });
         } 
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
+          await i.deferUpdate();
           const ultimeRapine = await Rapina.find()
             .sort({ date: -1, createdAt: -1 })
             .limit(10);
