@@ -5,11 +5,10 @@ const {
   ComponentType 
 } = require('discord.js');
 
-const Furto = require('../Models /Furto.js');
-const Rapina = require('../Models /Rapina.js');
-const Miniera = require('../Models /Miniera.js');
+const Furto = require('../Models/Furto.js');
+const Rapina = require('../Models/Rapina.js');
+const Miniera = require('../Models/Miniera.js');
 
-// Tutti i 9 materiali previsti dal comando miniera
 const LISTA_MINERALI_DEFAULT = [
   'legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'
 ];
@@ -99,7 +98,6 @@ module.exports = [
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          // .lean() legge direttamente l'oggetto JSON da MongoDB senza i vincoli dello schema Mongoose
           const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
@@ -113,14 +111,11 @@ module.exports = [
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
             
-            // Lettura dell'utente che ha effettuato l'estrazione
             const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
             const utente = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Estrazione dell'oggetto items
             const itemsObj = m.items || {};
 
-            // Mappatura completa per i 9 materiali
             const dettagliMinerali = LISTA_MINERALI_DEFAULT.map((mat) => {
               const qta = Number(itemsObj[mat]) || 0;
               return `${mat}: **${qta}**`;
@@ -169,30 +164,6 @@ module.exports = [
   },
   {
     data: new SlashCommandBuilder()
-      .setName('player')
-      .setDescription('Mostra le statistiche di un giocatore')
-      .addUserOption(opt => opt.setName('utente').setDescription('Utente di cui mostrare i dati').setRequired(true)),
-    async execute(interaction) {
-      await interaction.deferReply();
-      const target = interaction.options.getUser('utente');
-      await interaction.editReply({ content: `👤 Mostrando statistiche per **${target.tag}**.` });
-    }
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('aggiorna')
-      .setDescription('Aggiorna i dati nel database')
-      .addStringOption(opt => opt.setName('sezione').setDescription('Sezione da aggiornare').setRequired(true)),
-    async execute(interaction) {
-      await interaction.deferReply();
-      const sezione = interaction.options.getString('sezione');
-      await interaction.editReply({ content: `🔄 Sezione **${sezione}** aggiornata!` });
-    }
-  },
-
-  // --- COMANDO RESET CON MENU A TENDINA ---
-  {
-    data: new SlashCommandBuilder()
       .setName('reset')
       .setDescription('Azzera i dati registrati di un modulo o del database'),
     async execute(interaction) {
@@ -202,30 +173,10 @@ module.exports = [
         .setCustomId('select_reset_modulo')
         .setPlaceholder('Seleziona la sezione che vuoi azzerare...')
         .addOptions([
-          {
-            label: 'Reset Furti',
-            description: 'Elimina tutte le registrazioni dei furti',
-            value: 'reset_furti',
-            emoji: '🗑️',
-          },
-          {
-            label: 'Reset Miniera / Minerali',
-            description: 'Elimina tutti i log di estrazione mineraria',
-            value: 'reset_miniera',
-            emoji: '⛏️',
-          },
-          {
-            label: 'Reset Rapine',
-            description: 'Elimina tutte le registrazioni delle rapine',
-            value: 'reset_rapine',
-            emoji: '💰',
-          },
-          {
-            label: 'Reset Completo (Tutti i dati)',
-            description: '⚠️ AZZERA TUTTI I DATI (Furti, Rapine, Miniera)',
-            value: 'reset_tutto',
-            emoji: '⚠️',
-          },
+          { label: 'Reset Furti', value: 'reset_furti', emoji: '🗑️' },
+          { label: 'Reset Miniera / Minerali', value: 'reset_miniera', emoji: '⛏️' },
+          { label: 'Reset Rapine', value: 'reset_rapine', emoji: '💰' },
+          { label: 'Reset Completo (Tutti i dati)', value: 'reset_tutto', emoji: '⚠️' },
         ]);
 
       const row = new ActionRowBuilder().addComponents(resetMenu);
@@ -251,65 +202,22 @@ module.exports = [
         try {
           if (scelta === 'reset_furti') {
             await Furto.deleteMany({});
-            await interaction.editReply({ content: '✅ **Reset completato:** Tutte le registrazioni dei **Furti** sono state eliminate!', components: [] });
+            await interaction.editReply({ content: '✅ Registrazioni **Furti** eliminate!', components: [] });
           } else if (scelta === 'reset_miniera') {
             await Miniera.deleteMany({});
-            await interaction.editReply({ content: '✅ **Reset completato:** Tutti i log della **Miniera** sono stati eliminati!', components: [] });
+            await interaction.editReply({ content: '✅ Registrazioni **Miniera** eliminate!', components: [] });
           } else if (scelta === 'reset_rapine') {
             await Rapina.deleteMany({});
-            await interaction.editReply({ content: '✅ **Reset completato:** Tutte le registrazioni delle **Rapine** sono state eliminate!', components: [] });
+            await interaction.editReply({ content: '✅ Registrazioni **Rapine** eliminate!', components: [] });
           } else if (scelta === 'reset_tutto') {
-            await Promise.all([
-              Furto.deleteMany({}),
-              Miniera.deleteMany({}),
-              Rapina.deleteMany({})
-            ]);
-            await interaction.editReply({ content: '⚠️ **Reset generale completato:** Tutti i dati (Furti, Rapine e Miniera) sono stati azzerati con successo!', components: [] });
+            await Promise.all([Furto.deleteMany({}), Miniera.deleteMany({}), Rapina.deleteMany({})]);
+            await interaction.editReply({ content: '⚠️ **Tutti i dati azzerati con successo!**', components: [] });
           }
         } catch (error) {
-          console.error('Errore durante il reset:', error);
-          await interaction.editReply({ content: '❌ Si è verificato un errore durante l\'azzeramento dei dati nel database.', components: [] });
+          console.error('Errore reset:', error);
+          await interaction.editReply({ content: '❌ Errore durante il reset.', components: [] });
         }
       });
-
-      collector.on('end', async (collected, reason) => {
-        if (reason === 'time' && collected.size === 0) {
-          await interaction.editReply({ content: '⏱️ Tempo scaduto per selezionare l\'opzione di reset.', components: [] });
-        }
-      });
-    }
-  },
-
-  {
-    data: new SlashCommandBuilder()
-      .setName('modifica')
-      .setDescription('Modifica un record esistente nel DB')
-      .addStringOption(opt => opt.setName('id').setDescription('ID del record').setRequired(true))
-      .addStringOption(opt => opt.setName('valore').setDescription('Nuovo valore').setRequired(true)),
-    async execute(interaction) {
-      await interaction.deferReply();
-      const id = interaction.options.getString('id');
-      const val = interaction.options.getString('valore');
-      await interaction.editReply({ content: `✏️ Record \`${id}\` aggiornato a **${val}**.` });
-    }
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('calcolo')
-      .setDescription('Esegue un calcolo su un totale')
-      .addNumberOption(opt => opt.setName('totale').setDescription('Importo su cui effettuare il calcolo').setRequired(true)),
-    async execute(interaction) {
-      await interaction.deferReply();
-      const total = interaction.options.getNumber('totale');
-      await interaction.editReply({ content: `🧮 Calcolo completato per il totale **${total}**.` });
-    }
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('ping')
-      .setDescription('Verifica la latenza del bot'),
-    async execute(interaction) {
-      await interaction.reply({ content: '🏓 Pong!', flags: 64 });
     }
   }
 ];
