@@ -9,15 +9,8 @@ const Furto = require('../Models /Furto.js');
 const Rapina = require('../Models /Rapina.js');
 const Miniera = require('../Models /Miniera.js');
 
-// Lista dei minerali disponibili con opzione 0 inclusa
-const OPZIONI_MINERALI = [
-  { label: 'Nessun Minerale (0)', value: '0', description: 'Imposta la quantità a 0', emoji: '❌' },
-  { label: 'Ferro', value: 'ferro', description: 'Minerali di ferro raccolti', emoji: '🪨' },
-  { label: 'Rame', value: 'rame', description: 'Minerali di rame raccolti', emoji: '🟠' },
-  { label: 'Oro', value: 'oro', description: 'Pepite d\'oro raccolte', emoji: '🟡' },
-  { label: 'Diamante', value: 'diamante', description: 'Diamanti grezzi trovati', emoji: '💎' },
-  { label: 'Smeraldo', value: 'smeraldo', description: 'Smeraldi trovati', emoji: '🟢' }
-];
+// Elenco base dei minerali da mostrare sempre nel dettaglio (anche se 0)
+const LISTA_MINERALI_DEFAULT = ['ferro', 'rame', 'oro', 'diamante', 'smeraldo'];
 
 module.exports = [
   {
@@ -39,7 +32,7 @@ module.exports = [
           },
           {
             label: 'Minerali / Miniera',
-            description: 'Seleziona ed elenca i minerali raccolti',
+            description: 'Mostra i dettagli di tutti i minerali raccolti',
             value: 'lista_miniera',
             emoji: '⛏️',
           },
@@ -97,81 +90,55 @@ module.exports = [
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA (Menu Selezione Minerali) ---
+        // --- SEZIONE MINIERA (Elenco Completo Tutti i Minerali) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          // Sottomenu per selezionare lo specifico minerale (inclusa opzione 0)
-          const mineraliMenu = new StringSelectMenuBuilder()
-            .setCustomId('select_minerale_tipo')
-            .setPlaceholder('Seleziona il minerale da filtrare...')
-            .addOptions(OPZIONI_MINERALI);
+          const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10);
 
-          const mineraliRow = new ActionRowBuilder().addComponents(mineraliMenu);
+          if (!registrazioni || registrazioni.length === 0) {
+            return await interaction.editReply({ content: '⛏️ **Lista Miniera:** Nessun record trovato.', components: [] });
+          }
 
-          const minieraResponse = await interaction.editReply({
-            content: '⛏️ **Seleziona il minerale di cui vuoi consultare la raccolta:**',
-            components: [mineraliRow],
-          });
+          let testo = '⛏️ **Ultime 10 Registrazioni Miniera:**\n\n';
 
-          const subCollector = minieraResponse.createMessageComponentCollector({
-            componentType: ComponentType.StringSelect,
-            time: 60000,
-          });
+          registrazioni.forEach((m, index) => {
+            const rawDate = m.date || m.createdAt || new Date();
+            const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
+            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
+            const utente = m.executorId ? `<@${m.executorId}>` : (m.user ? `<@${m.user}>` : 'Sconosciuto');
 
-          subCollector.on('collect', async (subInt) => {
-            if (subInt.user.id !== interaction.user.id) {
-              return await subInt.reply({ content: '❌ Non puoi interagire con questo menu.', flags: 64 });
-            }
+            // Mappa o conteggio dei minerali per questa registrazione
+            let dettagliMinerali = [];
 
-            await subInt.deferUpdate();
-            const mineraleScelto = subInt.values[0];
-
-            // Gestione opzione 0 (Nessun minerale)
-            if (mineraleScelto === '0') {
-              return await interaction.editReply({ 
-                content: '⛏️ **Selezione Minerale:** Hai selezionato **0 / Nessun minerale**. Nessun filtro applicato.', 
-                components: [] 
+            if (m.items && Array.isArray(m.items) && m.items.length > 0) {
+              // Se i dati sono salvati come array di oggetti (es. [{ name: 'ferro', quantity: 5 }])
+              LISTA_MINERALI_DEFAULT.forEach((min) => {
+                const trovato = m.items.find(i => i.name && i.name.toLowerCase() === min);
+                const qta = trovato ? (trovato.quantity || 0) : 0;
+                dettagliMinerali.push(`${min}: **${qta}**`);
+              });
+            } else if (m.minerali && typeof m.minerali === 'object') {
+              // Se i dati sono salvati come oggetto (es. { ferro: 5, rame: 0 })
+              LISTA_MINERALI_DEFAULT.forEach((min) => {
+                const qta = m.minerali[min] || 0;
+                dettagliMinerali.push(`${min}: **${qta}**`);
+              });
+            } else if (m.mineralType && m.quantity !== undefined) {
+              // Se salvato come minerale singolo
+              dettagliMinerali.push(`${m.mineralType}: **${m.quantity}**`);
+            } else {
+              // Se non ci sono dati specifici sui singoli minerali
+              LISTA_MINERALI_DEFAULT.forEach((min) => {
+                dettagliMinerali.push(`${min}: **0**`);
               });
             }
 
-            // Ricerca nel DB per il minerale specifico
-            const registrazioni = await Miniera.find({ 
-              $or: [
-                { 'items.name': mineraleScelto },
-                { 'mineralType': mineraleScelto }
-              ]
-            }).sort({ date: -1, createdAt: -1 }).limit(10);
-
-            if (!registrazioni || registrazioni.length === 0) {
-              return await interaction.editReply({ 
-                content: `⛏️ **Lista Miniera (${mineraleScelto}):** Nessun record trovato per questo minerale.`, 
-                components: [] 
-              });
-            }
-
-            let testo = `⛏️ **Ultimi 10 Log per il minerale: ${mineraleScelto.toUpperCase()}**\n\n`;
-            registrazioni.forEach((m, index) => {
-              const rawDate = m.date || m.createdAt || new Date();
-              const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-              const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
-
-              const utente = m.executorId ? `<@${m.executorId}>` : 'Sconosciuto';
-              
-              // Estrazione quantità specifica
-              let quantita = 0;
-              if (m.items && Array.isArray(m.items)) {
-                const itemFound = m.items.find(i => i.name === mineraleScelto);
-                if (itemFound) quantita = itemFound.quantity || 0;
-              } else if (m.quantity) {
-                quantita = m.quantity;
-              }
-
-              testo += `**${index + 1}.** Utente: ${utente} | Quantità: **${quantita}** | Data: ${dateDisplay}\n`;
-            });
-
-            await interaction.editReply({ content: testo, components: [] });
+            testo += `**${index + 1}.** Utente: ${utente} | Data: ${dateDisplay}\n`;
+            testo += `┗ 📊 ${dettagliMinerali.join(' | ')}\n\n`;
           });
+
+          await interaction.editReply({ content: testo, components: [] });
         } 
         // --- SEZIONE RAPINE ---
         else if (selezione === 'lista_rapine') {
