@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const Rapina = require('../Models/Rapina.js'); // Import from /Models
+const Rapina = require('../Models /Rapina.js'); // Import from /Models
 
 module.exports = {
   data: new SlashCommandBuilder()
