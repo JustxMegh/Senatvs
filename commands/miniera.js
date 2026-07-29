@@ -33,10 +33,7 @@ module.exports = [
       for (const mat of materiali) {
         const val = interaction.options.getInteger(mat);
         if (val !== null && val > 0) {
-          // Forziamo la chiave rigorosamente in minuscolo per MongoDB
-          const chiaveMinuscola = mat.toLowerCase();
-          qty[chiaveMinuscola] = val;
-
+          qty[mat] = val;
           const sub = val * PREZZI[mat];
           guadagnoTotale += sub;
           totalePezzi += val;
@@ -50,14 +47,15 @@ module.exports = [
         return await interaction.editReply({ content: '⚠️ Inserisci la quantità di **almeno un minerale**!' });
       }
 
-      // Salvataggio pulito con chiavi minuscole
-      await Miniera.create({
-        executorId: interaction.user.id,
+      const nuovaEstrazione = new Miniera({
+        executorId: String(interaction.user.id),
         items: qty,
         totalItems: totalePezzi,
         totalEarnings: guadagnoTotale,
         date: new Date()
       });
+
+      await nuovaEstrazione.save();
 
       await interaction.editReply({
         content: `⛏️ **Estrazione registrata per ${interaction.user}!**\n\n` +
