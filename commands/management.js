@@ -89,11 +89,10 @@ module.exports = [
           await interaction.editReply({ content: testo, components: [] });
         } 
 
-       // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
+      // --- SEZIONE MINIERA (CHI HA PORTATO COSA) ---
         else if (selezione === 'lista_miniera') {
           await i.deferUpdate();
 
-          // Leggiamo i documenti dal DB
           const registrazioni = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10).lean();
 
           if (!registrazioni || registrazioni.length === 0) {
@@ -107,27 +106,41 @@ module.exports = [
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
             const dateDisplay = isNaN(timestampSec) ? '' : `<t:${timestampSec}:R>`;
             
-            // ID Utente
             const userId = m.executorId || m.userId || m.user || m.taggedUser || m.authorId;
-            const utente = userId ? `<@${userId}>` : 'Sconosciuto';
+            const utenteTag = userId ? `<@${userId}>` : 'Sconosciuto';
 
-            // Costruzione lista minerali con il trattino per ogni riga
-            const itemsObj = m.items || m.materiali || m.qty || {};
+            // Supporta sia oggetti tipo items, sia stockpile, sia proprietà dirette
+            const itemsObj = m.items || m.stockpile || m.materiali || m.qty || m;
             const dettagli = [];
-            const listaMateriali = ['legno', 'pietra', 'carbone', 'ferro', 'argento', 'rubino', 'oro', 'smeraldo', 'diamante'];
+            
+            // Controlliamo sia la versione minuscola che la versione con la maiuscola iniziale
+            const listaMateriali = [
+              { key: 'legno', altKey: 'Legno' },
+              { key: 'pietra', altKey: 'Pietra' },
+              { key: 'carbone', altKey: 'Carbone' },
+              { key: 'ferro', altKey: 'Ferro' },
+              { key: 'argento', altKey: 'Argento' },
+              { key: 'rubino', altKey: 'Rubino' },
+              { key: 'oro', altKey: 'Oro' },
+              { key: 'smeraldo', altKey: 'Smeraldo' },
+              { key: 'diamante', altKey: 'Diamante' }
+            ];
             
             for (const mat of listaMateriali) {
-              const qta = Number(itemsObj[mat] !== undefined ? itemsObj[mat] : m[mat]) || 0;
-              if (qta > 0) {
-                const nomeMat = mat.charAt(0).toUpperCase() + mat.slice(1);
-                dettagli.push(`- ${nomeMat}: ${qta}`);
+              let qta = 0;
+              if (itemsObj) {
+                if (itemsObj[mat.key] !== undefined) qta = Number(itemsObj[mat.key]);
+                else if (itemsObj[mat.altKey] !== undefined) qta = Number(itemsObj[mat.altKey]);
+              }
+
+              if (!isNaN(qta) && qta > 0) {
+                dettagli.push(`- ${mat.altKey}: ${qta}`);
               }
             }
 
             const elencoOggetti = dettagli.length > 0 ? dettagli.join('\n') : '- Nessun dettaglio';
 
-            // Formattazione identica al tuo esempio
-            testo += `**${index + 1}.** ${utente} (Data: ${dateDisplay})\n`;
+            testo += `**${index + 1}.** ${utenteTag} (Data: ${dateDisplay})\n`;
             testo += `┗ 📦 **Ha portato:**\n${elencoOggetti}\n\n`;
           });
 
