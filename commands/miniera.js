@@ -30,7 +30,6 @@ module.exports = [
       let totalePezzi = 0;
       let resoconto = [];
 
-      // Estraiamo solo i valori passati dall'utente
       for (const mat of materiali) {
         const val = interaction.options.getInteger(mat);
         if (val !== null && val > 0) {
@@ -46,28 +45,14 @@ module.exports = [
         return await interaction.editReply({ content: '⚠️ Inserisci la quantità di **almeno un minerale**!' });
       }
 
-      const userId = interaction.user.id;
-
-      // Stampiamo nel terminale per verfica immediata
-      console.log('--- REGISTRAZIONE MINIERA ---');
-      console.log('Utente ID:', userId);
-      console.log('Oggetto Quantità:', qty);
-      console.log('Totale Pezzi:', totalePezzi);
-      console.log('Guadagno:', guadagnoTotale);
-
-      // Salviamo nel DB specificando l'ID utente in tutti i formati possibili
-      const doc = await Miniera.create({
-        executorId: userId,
-        userId: userId,
-        user: userId,
+      // SALVIAMO L'ID UTENTE ESPLICITAMENTE
+      await Miniera.create({
+        executorId: interaction.user.id,
         items: qty,
-        materiali: qty,
         totalItems: totalePezzi,
         totalEarnings: guadagnoTotale,
         date: new Date()
       });
-
-      console.log('Documento creato nel DB:', doc);
 
       await interaction.editReply({
         content: `⛏️ **Estrazione registrata per ${interaction.user}!**\n\n` +
