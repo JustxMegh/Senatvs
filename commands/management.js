@@ -88,7 +88,7 @@ module.exports = [
 
           await interaction.editReply({ content: testo, components: [] });
         } 
-        // --- SEZIONE MINIERA ---
+        // --- SEZIONE MINIERA (Formattata come i Furti) ---
         else if (selezione === 'lista_miniera') {
           const miniera = await Miniera.find().sort({ date: -1, createdAt: -1 }).limit(10);
 
@@ -96,13 +96,16 @@ module.exports = [
             return await interaction.editReply({ content: '⛏️ **Lista Minerali/Miniera:** Nessun record trovato.', components: [] });
           }
 
-          let testo = '⛏️ **Ultimi 10 Log Miniera:**\n\n';
+          let testo = '⛏️ **Ultimi 10 Log Miniera Registrati:**\n\n';
           miniera.forEach((m, index) => {
             const rawDate = m.date || m.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : `| Data: <t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? 'Data non disponibile' : `<t:${timestampSec}:R>`;
 
-            testo += `**${index + 1}.** Utente: <@${m.executorId}> | Pezzi: **${m.totalItems || 0}** | Guadagno: **$${m.totalEarnings ? m.totalEarnings.toLocaleString() : 0}** ${dateDisplay}\n`;
+            const guadagno = m.totalEarnings ? m.totalEarnings.toLocaleString() : '0';
+            const utente = m.executorId ? `<@${m.executorId}>` : 'Sconosciuto';
+
+            testo += `**${index + 1}.** Utente: ${utente} | Totale guadagno: **$${guadagno}** | Data: ${dateDisplay}\n`;
           });
 
           await interaction.editReply({ content: testo, components: [] });
@@ -117,12 +120,12 @@ module.exports = [
             return await interaction.editReply({ content: '💰 **Lista Rapine:** Nessun record trovato.', components: [] });
           }
 
-          let testo = `💰 **Ultima Rapina / Ultime Rapine Registrate:**\n\n`;
+          let testo = `💰 **Ultime Rapine Registrate:**\n\n`;
 
           ultimeRapine.forEach((r, index) => {
             const rawDate = r.date || r.createdAt || new Date();
             const timestampSec = Math.floor(new Date(rawDate).getTime() / 1000);
-            const dateDisplay = isNaN(timestampSec) ? '' : `| <t:${timestampSec}:R>`;
+            const dateDisplay = isNaN(timestampSec) ? '' : `| Data: <t:${timestampSec}:R>`;
 
             testo += `**${index + 1}.** Totale: **$${(r.totalAmount || 0).toLocaleString()}** ${dateDisplay}\n`;
           });
